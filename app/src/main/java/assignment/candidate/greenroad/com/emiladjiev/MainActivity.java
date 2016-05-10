@@ -1,13 +1,15 @@
 package assignment.candidate.greenroad.com.emiladjiev;
 
-import android.Manifest;
+import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentSender;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.IBinder;
-import android.support.v4.app.ActivityCompat;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,21 +18,45 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.android.gms.appindexing.AppIndex;
+import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
+import com.google.android.gms.location.LocationSettingsStatusCodes;
+import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.squareup.otto.Subscribe;
 
-public class MainActivity extends FragmentActivity implements OnMapReadyCallback {
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
     private static final String TAG = "MainActivity";
     private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1001;
+    //private static final int REQUEST_CHECK_SETTINGS = 1002;
+    protected static final int REQUEST_CHECK_SETTINGS = 0x1;
 
     // Keys for storing activity state in the Bundle.
     protected final static String REQUESTING_LOCATION_UPDATES_KEY = "requesting_location_updates_key";
     protected final static String LOCATION_KEY = "location_key";
     protected final static String LAST_UPDATED_TIME_STRING_KEY = "last_updated_time_string_key";
+    protected final static String LAST_UPDATED_SPEED_FLOAT_KEY = "last_updated_spped_float_key";
+
 
     private SupportMapFragment mMapFragment;
     private GoogleMap mMap;
@@ -42,6 +68,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private TextView tvSpeedValue;
     private boolean mBounded;
     private BackgroundLocationService mLocationService;
+    private GoogleApiClient mGoogleApiClient;
 
     /**
      * Represents a geographical location.
@@ -52,6 +79,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      * Time when the location was updated represented as a String.
      */
     protected String mLastUpdateTime;
+    private Float mLastSpeed;
 
     /**
      * Tracks the status of the location updates request. Value changes when the user presses the
@@ -66,17 +94,14 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         mMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mMapFragment.getMapAsync(this);
-
         bEnable = (Button) findViewById(R.id.bEnable);
         bDisable = (Button) findViewById(R.id.bDisable);
-
         bEnable.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 startUpdatesButtonHandler();
             }
         });
-
         bDisable.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -91,24 +116,92 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
         mRequestingLocationUpdates = false;
         mLastUpdateTime = "";
+        mLastSpeed = 0f;
 
         // Update values using data stored in the Bundle.
         updateValuesFromBundle(savedInstanceState);
         setButtonsEnabledState();
     }
 
-
     @Override
     protected void onResume() {
         super.onResume();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+
+        addLocationsFromDBToMap();
+        if (PermissionUtils.checkForLocationPermission(this)) {
+            PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
             setAllButtonsToDisableState();
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         } else if (mRequestingLocationUpdates) {
-            startLocationService();
+            setUpGoogleApiClientIfNeededAndConnected();
         }
     }
+
+    private void addPolylineOnMap(LatLng previousLocation, LatLng location) {
+        if (previousLocation != null && location != null) {
+            mMap.addPolyline((new PolylineOptions()).add(previousLocation, location));
+        }
+    }
+
+    private LatLng getLatLngFromLocation(Location location) {
+        return new LatLng(location.getLatitude(), location.getLongitude());
+    }
+
+    @Override
+    protected void onStart() {
+        LocationUpdatesApplication.getInstance().getBus().register(this);
+        super.onStart();
+    }
+
+    @Override
+    protected void onStop() {
+        LocationUpdatesApplication.getInstance().getBus().unregister(this);
+        super.onStop();
+
+        if (mRequestingLocationUpdates) {
+            unbindFromLocationService();
+        }
+    }
+
+    @Subscribe
+    public void onLocationResultReceived(LocationResult locationResult) {
+        mCurrentLocation = locationResult.getLastLocation();
+        updateViewAndMap();
+
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    setButtonsEnabledState();
+                    if (mRequestingLocationUpdates) {
+                        setUpGoogleApiClientIfNeededAndConnected();
+                    }
+                }
+                return;
+            }
+        }
+    }
+
+    @Override
+    public void onMapReady(GoogleMap googleMap) {
+        mMap = googleMap;
+        addLocationsFromDBToMap();
+    }
+
+    private void addLocationsFromDBToMap() {
+        if (mMap != null) {
+            mMap.clear();
+            List<LuLocation> allSavedLocations = LocationUpdatesApplication.getInstance().getAllSavedLocations();
+            for (int i = 0; i < allSavedLocations.size() - 1; i++) {
+                mCurrentLocation = allSavedLocations.get(i + 1).getLocation();
+                addPolylineOnMap(allSavedLocations.get(i).getLatLong(), allSavedLocations.get(i + 1).getLatLong());
+            }
+        }
+    }
+
 
     /**
      * Ensures that only one button is enabled at any time. The Start Updates button is enabled
@@ -136,10 +229,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      */
     public void startUpdatesButtonHandler() {
         if (!mRequestingLocationUpdates) {
-            mRequestingLocationUpdates = true;
-            setButtonsEnabledState();
-            startLocationService();
-            //mLocationService.startLocationUpdates();
+            setUpGoogleApiClientIfNeededAndConnected();
         }
     }
 
@@ -150,8 +240,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     public void stopUpdatesButtonHandler() {
         if (mRequestingLocationUpdates) {
             mRequestingLocationUpdates = false;
+            stopLocationService();
             setButtonsEnabledState();
-            mLocationService.stopLocationUpdates();
         }
     }
 
@@ -159,9 +249,10 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      * Updates the latitude, the longitude, and the last location time in the UI.
      */
     private void updateUI() {
-        tvLatitudeValue.setText(String.format("%f", mCurrentLocation.getLatitude()));
-        tvLongitudeValue.setText(String.format("%f", mCurrentLocation.getLongitude()));
+        tvLatitudeValue.setText(String.format("%s", mCurrentLocation != null ? "" + mCurrentLocation.getLatitude() : ""));
+        tvLongitudeValue.setText(String.format("%s", mCurrentLocation != null ? "" + mCurrentLocation.getLongitude() : ""));
         tvLastUpdateValue.setText(String.format("%s", mLastUpdateTime));
+        tvSpeedValue.setText(String.valueOf(mLastSpeed));
     }
 
     /**
@@ -191,6 +282,11 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             if (savedInstanceState.keySet().contains(LAST_UPDATED_TIME_STRING_KEY)) {
                 mLastUpdateTime = savedInstanceState.getString(LAST_UPDATED_TIME_STRING_KEY);
             }
+
+            // Update the value of mLastUpdateTime from the Bundle and update the UI.
+            if (savedInstanceState.keySet().contains(LAST_UPDATED_SPEED_FLOAT_KEY)) {
+                mLastSpeed = savedInstanceState.getFloat(LAST_UPDATED_SPEED_FLOAT_KEY);
+            }
             updateUI();
         }
     }
@@ -199,53 +295,55 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private void startLocationService() {
         Intent locationServiceIntent = new Intent(this, BackgroundLocationService.class);
         startService(locationServiceIntent);
+        bindToLocationService();
+        mRequestingLocationUpdates = true;
+        setButtonsEnabledState();
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    setButtonsEnabledState();
-                    if (mRequestingLocationUpdates) {
-                        startLocationService();
-                    }
-                }
-                return;
-            }
+    private void stopLocationService() {
+        unbindFromLocationService();
+        stopService(new Intent(this, BackgroundLocationService.class));
+    }
+
+    private void bindToLocationService() {
+        Intent mIntent = new Intent(this, BackgroundLocationService.class);
+        bindService(mIntent, mConnection, BIND_AUTO_CREATE);
+    }
+
+    private void unbindFromLocationService() {
+        unbindService(mConnection);
+    }
+
+    public void zoomInMapOnMyCurrentLocationWithZoom(float zoomLevel, GoogleMap map, Location location) {
+        if (location != null && map != null) {
+            map.animateCamera(CameraUpdateFactory.newCameraPosition(getCameraPositionFromLocationWithZoom(location, zoomLevel)));
         }
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
+    public static CameraPosition getCameraPositionFromLocationWithZoom(Location location, float zoomLevel) {
+        CameraPosition cameraPosition = new CameraPosition.Builder()
+                .target(new LatLng(location.getLatitude(), location.getLongitude()))
+                .zoom(zoomLevel).build();
+
+        return cameraPosition;
+    }
+
+    /*
+     * Create a new location client, using the enclosing class to
+     * handle callbacks.
      */
-    @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
+    private void setUpGoogleApiClientIfNeededAndConnected() {
+        if (mGoogleApiClient == null)
+            mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
+        mGoogleApiClient.connect();
     }
 
     @Override
-    protected void onStart() {
-        super.onStart();
-        Intent mIntent = new Intent(this, BackgroundLocationService.class);
-        bindService(mIntent, mConnection, BIND_AUTO_CREATE);
-    };
-
-    /**
-     * Stores activity data in the Bundle.
-     */
-    public void onSaveInstanceState(Bundle savedInstanceState) {
+    protected void onSaveInstanceState(Bundle savedInstanceState) {
         savedInstanceState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY, mRequestingLocationUpdates);
         savedInstanceState.putParcelable(LOCATION_KEY, mCurrentLocation);
         savedInstanceState.putString(LAST_UPDATED_TIME_STRING_KEY, mLastUpdateTime);
+        savedInstanceState.putFloat(LAST_UPDATED_SPEED_FLOAT_KEY, mLastSpeed);
         super.onSaveInstanceState(savedInstanceState);
     }
 
@@ -260,7 +358,171 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             Toast.makeText(MainActivity.this, "Service is connected", Toast.LENGTH_SHORT).show();
             mBounded = true;
             BackgroundLocationService.LocalBinder mLocalBinder = (BackgroundLocationService.LocalBinder)service;
-            mLocationService = mLocalBinder.getServerInstance();
+            mLocationService = mLocalBinder.getServerInstance(MainActivity.this);
         }
     };
+
+    public void handleGetDirectionsResult(ArrayList<LatLng> result) {
+    }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        if (PermissionUtils.checkForLocationPermission(this)) {
+            return;
+        }
+
+        checkForLocationSettings();
+
+        mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        updateViewAndMap();
+
+       /* mGoogleApiClient.disconnect();
+        mGoogleApiClient = null;*/
+    }
+
+    private void updateViewAndMap() {
+        if (mCurrentLocation != null) {
+            SimpleDateFormat outFmt = new SimpleDateFormat("HH:mm:ss");
+            Date date = new Date(mCurrentLocation.getTime());
+            mLastUpdateTime = outFmt.format(date);
+
+            mLastSpeed = mCurrentLocation.getSpeed();
+
+            updateUI();
+            zoomInMapOnMyCurrentLocationWithZoom(16, mMap, mCurrentLocation);
+        }
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        addPolylineOnMap(getLatLngFromLocation(mCurrentLocation), getLatLngFromLocation(location));
+        mCurrentLocation = location;
+        updateViewAndMap();
+    }
+
+    public static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
+    public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
+
+    protected LocationRequest getLocationRequest() {
+        LocationRequest locationRequest = new LocationRequest();
+
+        // Sets the desired interval for active location updates. This interval is
+        // inexact. You may not receive updates at all if no location sources are available, or
+        // you may receive them slower than requested. You may also receive updates faster than
+        // requested if other applications are requesting location at a faster interval.
+        locationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
+
+        // Sets the fastest rate for active location updates. This interval is exact, and your
+        // application will never receive updates faster than this value.
+        locationRequest.setFastestInterval(FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
+
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+
+        return locationRequest;
+    }
+
+    // The callback for the management of the user settings regarding location
+    ResultCallback<LocationSettingsResult> mResultCallbackFromSettings = new ResultCallback<LocationSettingsResult>() {
+        @Override
+        public void onResult(LocationSettingsResult result) {
+            final Status status = result.getStatus();
+            //final LocationSettingsStates locationSettingsStates = result.getLocationSettingsStates();
+            switch (status.getStatusCode()) {
+                case LocationSettingsStatusCodes.SUCCESS:
+                    // All location settings are satisfied. The client can initialize location requests here.
+                    startLocationService();
+                    break;
+                case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                    // Location settings are not satisfied. But could be fixed by showing the user
+                    // a dialog.
+                    try {
+                        // Show the dialog by calling startResolutionForResult(),
+                        // and check the result in onActivityResult().
+                        status.startResolutionForResult(MainActivity.this,
+                                REQUEST_CHECK_SETTINGS);
+                    } catch (IntentSender.SendIntentException e) {
+                        // Ignore the error.
+                    }
+                    break;
+                case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                    Log.e(TAG, "Settings change unavailable. We have no way to fix the settings so we won't show the dialog.");
+                    break;
+            }
+        }
+    };
+
+
+    private void checkForLocationSettings() {
+        LocationSettingsRequest.Builder locationSettingsRequestBuilder = new LocationSettingsRequest.Builder().addLocationRequest(getLocationRequest());
+        locationSettingsRequestBuilder.setAlwaysShow(true);
+        PendingResult<LocationSettingsResult> result =
+                LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient, locationSettingsRequestBuilder.build());
+        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
+            @Override
+            public void onResult(LocationSettingsResult result) {
+                final Status status = result.getStatus();
+                //final LocationSettingsStates locationSettingsStates = result.getLocationSettingsStates();
+                switch (status.getStatusCode()) {
+                    case LocationSettingsStatusCodes.SUCCESS:
+                        // All location settings are satisfied. The client can initialize location requests here.
+                        startLocationService();
+                        break;
+                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                        // Location settings are not satisfied. But could be fixed by showing the user
+                        // a dialog.
+                        try {
+                            // Show the dialog by calling startResolutionForResult(),
+                            // and check the result in onActivityResult().
+                            status.startResolutionForResult(MainActivity.this,
+                                    REQUEST_CHECK_SETTINGS);
+                        } catch (IntentSender.SendIntentException e) {
+                            // Ignore the error.
+                        }
+                        break;
+                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                        Log.e(TAG, "Settings change unavailable. We have no way to fix the settings so we won't show the dialog.");
+                        break;
+                }
+            }
+        });
+    }
+
+    /**
+     * Used to check the result of the check of the user location settings
+     *
+     * @param requestCode code of the request made
+     * @param resultCode code of the result of that request
+     * @param intent intent with further information
+     */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        //final LocationSettingsStates states = LocationSettingsStates.fromIntent(intent);
+        switch (requestCode) {
+            case REQUEST_CHECK_SETTINGS:
+                switch (resultCode) {
+                    case Activity.RESULT_OK:
+                        // All required changes were successfully made
+                        if (mGoogleApiClient.isConnected()) {
+                            startLocationService();
+                        }
+                        break;
+                    case Activity.RESULT_CANCELED:
+                        // The user was asked to change settings, but chose not to
+                        break;
+                    default:
+                        break;
+                }
+                break;
+        }
+    }
 }

@@ -40,6 +40,7 @@ import java.util.Date;
 public class BackgroundLocationService extends Service implements
         LocationListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
+    private static final String TAG = "LocationService";
     /**
      * The desired interval for location updates. Inexact. Updates may be more or less frequent.
      */
@@ -61,11 +62,12 @@ public class BackgroundLocationService extends Service implements
     // Flag that indicates if a request is underway.
     private boolean mInProgress;
     private PowerManager.WakeLock mWakeLock;
-
     private Boolean servicesAvailable = false;
+    private LocationListener mListener;
 
     public class LocalBinder extends Binder {
-        public BackgroundLocationService getServerInstance() {
+        public BackgroundLocationService getServerInstance(LocationListener listener) {
+            BackgroundLocationService.this.mListener = listener;
             return BackgroundLocationService.this;
         }
     }
@@ -93,7 +95,7 @@ public class BackgroundLocationService extends Service implements
      * the AndroidManifest.xml.
      * <p/>
      * When the ACCESS_FINE_LOCATION setting is specified, combined with a fast update
-     * interval (5 seconds), the Fused Location Provider API returns location updates that are
+     * interval (5 seconds), the Fused LuLocation Provider API returns location updates that are
      * accurate to within a few feet.
      * <p/>
      * These settings are appropriate for mapping applications that show real-time location
@@ -137,21 +139,21 @@ public class BackgroundLocationService extends Service implements
     }
 
 
-    public int onStartCommand (Intent intent, int flags, int startId) {
+    public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
-        PowerManager mgr = (PowerManager)getSystemService(Context.POWER_SERVICE);
+        PowerManager mgr = (PowerManager) getSystemService(Context.POWER_SERVICE);
 
-    /*
-    WakeLock is reference counted so we don't want to create multiple WakeLocks. So do a check before initializing and acquiring.
-    This will fix the "java.lang.Exception: WakeLock finalized while still held: MyWakeLock" error that you may find.
-    */
- /*       if (this.mWakeLock == null) { /*//**Added this
+        /*
+        WakeLock is reference counted so we don't want to create multiple WakeLocks. So do a check before initializing and acquiring.
+        This will fix the "java.lang.Exception: WakeLock finalized while still held: MyWakeLock" error that you may find.
+        */
+        if (this.mWakeLock == null) {
             this.mWakeLock = mgr.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "MyWakeLock");
         }
 
-        if (!this.mWakeLock.isHeld()) { /*//**Added this
+        if (!this.mWakeLock.isHeld()) {
             this.mWakeLock.acquire();
-        }*/
+        }
 
         if (!servicesAvailable || mGoogleApiClient.isConnected() || mInProgress)
             return START_STICKY;
@@ -174,11 +176,7 @@ public class BackgroundLocationService extends Service implements
      */
     private void setUpGoogleApiClientIfNeeded() {
         if (mGoogleApiClient == null)
-            mGoogleApiClient = new GoogleApiClient.Builder(this)
-                    .addApi(LocationServices.API)
-                    .addConnectionCallbacks(this)
-                    .addOnConnectionFailedListener(this)
-                    .build();
+            mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
     }
 
     // Define the callback method that receives location updates
@@ -250,13 +248,13 @@ public class BackgroundLocationService extends Service implements
     }
 
     /*
-     * Called by Location Services when the request to connect the
+     * Called by LuLocation Services when the request to connect the
      * client finishes successfully. At this point, you can
      * request the current location or start periodic updates
      */
     @Override
     public void onConnected(Bundle bundle) {
-       startLocationUpdates();
+        startLocationUpdates();
     }
 
     /**
@@ -264,8 +262,7 @@ public class BackgroundLocationService extends Service implements
      */
     protected void startLocationUpdates() {
         Intent intent = new Intent(this, LocationReceiver.class);
-        PendingIntent pendingIntent = PendingIntent
-                .getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
@@ -278,10 +275,21 @@ public class BackgroundLocationService extends Service implements
      * Removes location updates from the FusedLocationApi.
      */
     protected void stopLocationUpdates() {
+        Intent intent = new Intent(this, LocationReceiver.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         // It is a good practice to remove location requests when the activity is in a paused or
         // stopped state. Doing so helps battery performance and is especially
         // recommended in applications that request frequent location updates.
-        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, this);
+        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, pendingIntent);
+    }
+
+    protected Location getLastKnownLocation() {
+        if (PermissionUtils.checkForLocationPermission(this)) {
+            return null;
+        }
+
+        Location mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+        return mLastLocation;
     }
 
     @Override
@@ -296,8 +304,8 @@ public class BackgroundLocationService extends Service implements
     }
 
     /*
-     * Called by Location Services if the attempt to
-     * Location Services fails.
+     * Called by LuLocation Services if the attempt to
+     * LuLocation Services fails.
      */
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
@@ -317,18 +325,7 @@ public class BackgroundLocationService extends Service implements
         }
     }
 
-    public  static class LocationReceiver extends BroadcastReceiver {
-
-        private String TAG = this.getClass().getSimpleName();
-        private LocationResult mLocationResult;
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            // Need to check and grab the Intent's extras like so
-            if(LocationResult.hasResult(intent)) {
-                this.mLocationResult = LocationResult.extractResult(intent);
-                Log.i(TAG, "Location Received: " + this.mLocationResult.toString());
-            }
-        }
+    public LocationRequest getLocationRequest() {
+        return mLocationRequest;
     }
 }
