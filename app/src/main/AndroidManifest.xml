@@ -4,8 +4,10 @@
 
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <application
+        android:name=".LocationUpdatesApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -36,7 +38,7 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name=".BackgroundLocationService$LocationReceiver" android:label="LocationReceiver"/>
+        <receiver android:name="LocationReceiver" android:label="LocationReceiver"/>
         <service android:name=".BackgroundLocationService" android:exported="false" />
 
         <!-- ATTENTION: This was auto-generated to add Google Play services to your project for
@@ -44,6 +46,12 @@
         <meta-data
             android:name="com.google.android.gms.version"
             android:value="@integer/google_play_services_version" />
+
+        <!-- Active Android models declarations -->
+        <meta-data
+            android:name="AA_MODELS"
+            android:value="assignment.candidate.greenroad.com.emiladjiev.LuLocation" />
+
     </application>
 
 </manifest>
