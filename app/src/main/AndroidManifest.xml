@@ -38,7 +38,7 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name="LocationReceiver" android:label="LocationReceiver"/>
+        <receiver android:name="RealmLocationReceiver" android:label="LocationReceiver"/>
         <service android:name=".BackgroundLocationService" android:exported="false" />
 
         <!-- ATTENTION: This was auto-generated to add Google Play services to your project for

@@ -252,21 +252,20 @@ public class BackgroundLocationService extends Service implements
      * Requests location updates from the FusedLocationApi.
      */
     protected void startLocationUpdates() {
-        Intent intent = new Intent(this, LocationReceiver.class);
+        Intent intent = new Intent(this, RealmLocationReceiver.class);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             return;
         }
 
         LocationServices.FusedLocationApi.requestLocationUpdates(this.mGoogleApiClient, mLocationRequest, pendingIntent); // This is the changed line.
-        //appendLog(DateFormat.getDateTimeInstance().format(new Date()) + ": Connected", Constants.LOG_FILE);
     }
 
     /**
      * Removes location updates from the FusedLocationApi.
      */
     protected void stopLocationUpdates() {
-        Intent intent = new Intent(this, LocationReceiver.class);
+        Intent intent = new Intent(this, RealmLocationReceiver.class);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
         // It is a good practice to remove location requests when the activity is in a paused or
         // stopped state. Doing so helps battery performance and is especially
