@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.active_android;
 
 import android.location.Location;
 

@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.active_android;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -6,6 +6,9 @@ import android.content.Intent;
 import android.util.Log;
 
 import com.google.android.gms.location.LocationResult;
+
+import assignment.candidate.greenroad.com.emiladjiev.LUSApplication;
+import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
 
 /**
  * Created by Emil on 09/05/2016.
@@ -24,6 +27,8 @@ public class LocationReceiver extends BroadcastReceiver {
 
             LUSLocation lastLocation = new LUSLocation(mLocationResult.getLastLocation());
             lastLocation.save();
+
+
 
             LUSApplication.getInstance().getBus().post(mLocationResult);
         }
