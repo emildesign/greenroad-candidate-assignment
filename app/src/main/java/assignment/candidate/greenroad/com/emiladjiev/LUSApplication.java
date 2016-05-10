@@ -13,6 +13,8 @@ import java.util.List;
 import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
+import io.realm.RealmResults;
+import io.realm.Sort;
 
 /**
  * Created by Emil on 10/05/2016.
@@ -43,11 +45,15 @@ public class LUSApplication extends Application {
         return mBus;
     }
 
-    public List<LUSLocation> getAllSavedLocations() {
+    public List<LUSLocation> getAllActiveAndroidSavedLocations() {
         return new Select()
                 .from(LUSLocation.class)
                 .orderBy("time ASC")
                 .execute();
+    }
+
+    public RealmResults<RealmLocation> getAllRealmLocations() {
+        return  getRealm().where(RealmLocation.class).findAllSorted("time", Sort.ASCENDING);
     }
 
     private void initRealm() {
@@ -56,7 +62,7 @@ public class LUSApplication extends Application {
         }
 
         // Create the Realm configuration
-        RealmConfiguration realmConfig = new RealmConfiguration.Builder(this).build();
+        RealmConfiguration realmConfig = new RealmConfiguration.Builder(this).name("locations.realm").build();
         // Open the Realm for the UI thread.
         mRealm = Realm.getInstance(realmConfig);
     }

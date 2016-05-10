@@ -46,6 +46,7 @@ import java.util.List;
 import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
+import io.realm.RealmResults;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
@@ -95,7 +96,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         mMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mMapFragment.getMapAsync(this);
         bEnable = (Button) findViewById(R.id.bEnable);
@@ -131,8 +131,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     protected void onResume() {
         super.onResume();
-
-        addLocationsFromDBToMap();
+        addLocationsFromRealmDBToMap();
         if (PermissionUtils.checkForLocationPermission(this)) {
             PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
             setAllButtonsToDisableState();
@@ -165,13 +164,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    /**
-     * Used to check the result of the check of the user location settings
-     *
-     * @param requestCode code of the request made
-     * @param resultCode code of the result of that request
-     * @param intent intent with further information
-     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
         //final LocationSettingsStates states = LocationSettingsStates.fromIntent(intent);
@@ -211,9 +203,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        addLocationsFromDBToMap();
+        //addLocationsFromActiveAndroidDBToMap();
+        addLocationsFromRealmDBToMap();
     }
-
 
     @Subscribe
     public void onLocationResultReceived(LocationResult locationResult) {
@@ -221,16 +213,30 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         updateViewAndMap();
     }
 
-    private void addLocationsFromDBToMap() {
+    /*private void addLocationsFromActiveAndroidDBToMap() {
         if (mMap != null) {
             mMap.clear();
-            List<LUSLocation> allSavedLocations = LUSApplication.getInstance().getAllSavedLocations();
+            List<LUSLocation> allSavedLocations = LUSApplication.getInstance().getAllActiveAndroidSavedLocations();
             for (int i = 0; i < allSavedLocations.size() - 1; i++) {
                 mCurrentLocation = allSavedLocations.get(i + 1).getLocation();
                 addPolylineOnMap(allSavedLocations.get(i).getLatLong(), allSavedLocations.get(i + 1).getLatLong());
             }
         }
+    }*/
+
+    private void addLocationsFromRealmDBToMap() {
+        if (mMap != null) {
+            mMap.clear();
+            RealmResults<RealmLocation> allRealmLocations = LUSApplication.getInstance().getAllRealmLocations();
+            for (int i = 0; i < allRealmLocations.size() - 1; i++) {
+                mCurrentLocation = allRealmLocations.get(i + 1).getLocation();
+                addPolylineOnMap(allRealmLocations.get(i).getLatLong(), allRealmLocations.get(i + 1).getLatLong());
+            }
+        }
     }
+
+
+
 
 
     /**
