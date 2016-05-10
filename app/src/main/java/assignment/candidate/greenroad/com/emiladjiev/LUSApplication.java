@@ -13,14 +13,14 @@ import java.util.List;
 /**
  * Created by Emil on 10/05/2016.
  */
-public class LocationUpdatesApplication extends Application {
+public class LUSApplication extends Application {
 
     private final Bus mBus = new Bus(ThreadEnforcer.ANY);
 
-    private static LocationUpdatesApplication mInstance = null;
+    private static LUSApplication mInstance = null;
 
     // Getter to access Singleton instance
-    public static LocationUpdatesApplication getInstance() {
+    public static LUSApplication getInstance() {
         return mInstance;
     }
 
@@ -28,7 +28,7 @@ public class LocationUpdatesApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
-        Configuration dbConfiguration = new Configuration.Builder(this).setDatabaseName("locations.db").addModelClass(LuLocation.class).create();
+        Configuration dbConfiguration = new Configuration.Builder(this).setDatabaseName("locations.db").addModelClass(LUSLocation.class).create();
         ActiveAndroid.initialize(dbConfiguration);
 
         mInstance = this;
@@ -38,9 +38,9 @@ public class LocationUpdatesApplication extends Application {
         return mBus;
     }
 
-    public List<LuLocation> getAllSavedLocations() {
+    public List<LUSLocation> getAllSavedLocations() {
         return new Select()
-                .from(LuLocation.class)
+                .from(LUSLocation.class)
                 .orderBy("time ASC")
                 .execute();
     }

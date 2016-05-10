@@ -11,8 +11,8 @@ import com.google.android.gms.maps.model.LatLng;
  * Created by Emil on 10/05/2016.
  */
 
-@Table(name = "LuLocation")
-public class LuLocation extends Model{
+@Table(name = "LUSLocation")
+public class LUSLocation extends Model {
 
     @Column(name = "latitude")
     public String latitude;
@@ -26,15 +26,15 @@ public class LuLocation extends Model{
     @Column(name = "speed")
     public float speed;
 
-    public LuLocation() {
+    public LUSLocation() {
         super();
     }
 
-    public LuLocation(Location location) {
+    public LUSLocation(Location location) {
         this(String.valueOf(location.getLatitude()), String.valueOf(location.getLongitude()), location.getTime(), location.getSpeed());
     }
 
-    public LuLocation(String latitude, String longitude, Long time, float speed) {
+    public LUSLocation(String latitude, String longitude, Long time, float speed) {
         super();
         this.latitude = latitude;
         this.longitude = longitude;
@@ -43,7 +43,7 @@ public class LuLocation extends Model{
     }
 
     public Location getLocation() {
-        Location location = new Location("LuLocation");
+        Location location = new Location("LUSLocation");
         location.setLatitude(Double.valueOf(latitude));
         location.setLongitude(Double.valueOf(longitude));
         location.setSpeed(speed);
