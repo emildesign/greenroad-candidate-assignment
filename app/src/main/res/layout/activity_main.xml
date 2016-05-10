@@ -1,8 +1,136 @@
-<fragment xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:map="http://schemas.android.com/apk/res-auto"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/map"
-    android:name="com.google.android.gms.maps.SupportMapFragment"
-    android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="assignment.candidate.greenroad.com.emiladjiev.MainActivity" />
+    android:layout_width="match_parent">
+
+    <fragment
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context="assignment.candidate.greenroad.com.emiladjiev.MainActivity"
+        android:layout_below="@+id/relativeLayout" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:id="@+id/relativeLayout"
+        android:paddingRight="5dp"
+        android:paddingLeft="5dp"
+        android:paddingBottom="5dp">
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enable"
+            android:id="@+id/bEnable"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="5dp" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="disable"
+            android:id="@+id/bDisable"
+            android:layout_below="@+id/bEnable"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="5dp"
+            android:layout_marginBottom="5dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Latitude:"
+            android:id="@+id/tvLatitude"
+            android:layout_alignTop="@+id/bEnable"
+            android:layout_alignParentLeft="true"
+            android:textStyle="bold"
+            android:textSize="20dp"
+            android:layout_marginTop="5dp"
+            android:layout_alignParentStart="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="value"
+            android:textSize="18dp"
+            android:id="@+id/tvLatitudeValue"
+            android:layout_marginLeft="10dp"
+            android:layout_alignBaseline="@id/tvLatitude"
+            android:layout_toRightOf="@+id/tvLatitude"
+            android:layout_toEndOf="@+id/tvLatitude" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Longitude:"
+            android:id="@+id/tvLongitude"
+            android:textStyle="bold"
+            android:textSize="20dp"
+            android:layout_marginTop="5dp"
+            android:layout_below="@+id/tvLatitude"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="value"
+            android:id="@+id/tvLongitudeValue"
+            android:layout_marginLeft="10dp"
+            android:textSize="18dp"
+            android:layout_alignBaseline="@id/tvLongitude"
+            android:layout_toRightOf="@+id/tvLongitude"
+            android:layout_toEndOf="@+id/tvLongitude" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Last Update:"
+            android:id="@+id/tvLastUpdate"
+            android:textStyle="bold"
+            android:textSize="20dp"
+            android:layout_marginTop="5dp"
+            android:layout_below="@+id/tvLongitude"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="value"
+            android:id="@+id/tvLastUpdateValue"
+            android:layout_marginLeft="10dp"
+            android:textSize="18dp"
+            android:layout_alignBaseline="@id/tvLastUpdate"
+            android:layout_toRightOf="@+id/tvLastUpdate"
+            android:layout_toEndOf="@+id/tvLastUpdate" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Speed:"
+            android:id="@+id/tvSpeed"
+            android:textStyle="bold"
+            android:textSize="20dp"
+            android:layout_marginTop="5dp"
+            android:layout_below="@+id/tvLastUpdateValue"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="value"
+            android:id="@+id/tvSpeedValue"
+            android:layout_marginLeft="10dp"
+            android:textSize="18dp"
+            android:layout_alignBaseline="@id/tvSpeed"
+            android:layout_toRightOf="@+id/tvSpeed"
+            android:layout_toEndOf="@+id/tvSpeed" />
+    </RelativeLayout>
+</RelativeLayout>
+
+
