@@ -10,6 +10,10 @@ import com.squareup.otto.ThreadEnforcer;
 
 import java.util.List;
 
+import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
+import io.realm.Realm;
+import io.realm.RealmConfiguration;
+
 /**
  * Created by Emil on 10/05/2016.
  */
@@ -18,6 +22,7 @@ public class LUSApplication extends Application {
     private final Bus mBus = new Bus(ThreadEnforcer.ANY);
 
     private static LUSApplication mInstance = null;
+    private Realm mRealm;
 
     // Getter to access Singleton instance
     public static LUSApplication getInstance() {
@@ -43,5 +48,21 @@ public class LUSApplication extends Application {
                 .from(LUSLocation.class)
                 .orderBy("time ASC")
                 .execute();
+    }
+
+    private void initRealm() {
+        if (mRealm != null) {
+            return;
+        }
+
+        // Create the Realm configuration
+        RealmConfiguration realmConfig = new RealmConfiguration.Builder(this).build();
+        // Open the Realm for the UI thread.
+        mRealm = Realm.getInstance(realmConfig);
+    }
+
+    public Realm getRealm() {
+        initRealm();
+        return mRealm;
     }
 }
