@@ -21,6 +21,11 @@ public class LocationReceiver extends BroadcastReceiver {
         if(LocationResult.hasResult(intent)) {
             this.mLocationResult = LocationResult.extractResult(intent);
             Log.i(TAG, "Location Received: " + this.mLocationResult.toString());
+
+            LuLocation lastLocation = new LuLocation(mLocationResult.getLastLocation());
+            lastLocation.save();
+
+            LocationUpdatesApplication.getInstance().getBus().post(mLocationResult);
         }
     }
 }
