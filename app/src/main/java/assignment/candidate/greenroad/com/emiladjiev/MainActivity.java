@@ -332,6 +332,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 mLastSpeed = savedInstanceState.getFloat(LAST_UPDATED_SPEED_FLOAT_KEY);
             }
             updateUI();
+        } else if (AndroidHelper.isServiceRunning(this, BackgroundLocationService.class)) {
+            bindToLocationService();
+            mRequestingLocationUpdates = true;
         }
     }
 
