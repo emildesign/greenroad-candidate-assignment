@@ -34,6 +34,7 @@ public class RealmHelper {
         return realmLocation;
     }
 
+    @Deprecated
     public static void saveLocationByExecutingTransactionWithCallback(Realm realm, final Location location, @Nullable Realm.Transaction.Callback callback) {
         realm.executeTransaction(new Realm.Transaction() {
             @Override
@@ -45,6 +46,19 @@ public class RealmHelper {
                 realmLocation.setTime(location.getTime());
             }
         }, callback);
+    }
+
+    public static void saveLocationByExecutingTransactionWithCallbacks(Realm realm, final Location location, @Nullable Realm.Transaction.OnSuccess onSuccess, @Nullable Realm.Transaction.OnError onError) {
+        realm.executeTransactionAsync(new Realm.Transaction() {
+            @Override
+            public void execute(Realm realm) {
+                RealmLocation realmLocation = realm.createObject(RealmLocation.class); //realmLocation is a realm object that I can modify and will be saved to DB.
+                realmLocation.setLatitude(String.valueOf(location.getLatitude()));
+                realmLocation.setLongitude(String.valueOf(location.getLongitude()));
+                realmLocation.setSpeed(location.getSpeed());
+                realmLocation.setTime(location.getTime());
+            }
+        }, onSuccess, onError);
     }
 }
 
