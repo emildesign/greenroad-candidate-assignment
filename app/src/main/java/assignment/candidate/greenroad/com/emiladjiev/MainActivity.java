@@ -209,8 +209,15 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Subscribe
     public void onLocationResultReceived(LocationResult locationResult) {
-        mCurrentLocation = locationResult.getLastLocation();
-        updateViewAndMap();
+        Location location = locationResult.getLastLocation();
+        if (location != null && mCurrentLocation != null) {
+            addPolylineOnMap(getLatLngFromLocation(mCurrentLocation), getLatLngFromLocation(location));
+            mCurrentLocation = location;
+            updateViewAndMap();
+        } else if (location != null) {
+            mCurrentLocation = location;
+            updateViewAndMap();
+        }
     }
 
     /*private void addLocationsFromActiveAndroidDBToMap() {
