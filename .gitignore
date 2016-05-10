@@ -60,3 +60,4 @@ gradlew
 .jira-url
 atlassian-ide-plugin.xml
 gradlew.bat
+app/src/debug/res/values/google_maps_api.xml
