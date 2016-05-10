@@ -51,7 +51,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="value"
+            android:text=""
             android:textSize="18dp"
             android:id="@+id/tvLatitudeValue"
             android:layout_marginLeft="10dp"
@@ -74,7 +74,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="value"
+            android:text=""
             android:id="@+id/tvLongitudeValue"
             android:layout_marginLeft="10dp"
             android:textSize="18dp"
@@ -97,7 +97,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="value"
+            android:text=""
             android:id="@+id/tvLastUpdateValue"
             android:layout_marginLeft="10dp"
             android:textSize="18dp"
@@ -120,7 +120,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="value"
+            android:text=""
             android:id="@+id/tvSpeedValue"
             android:layout_marginLeft="10dp"
             android:textSize="18dp"
