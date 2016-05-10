@@ -86,6 +86,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      * Start Updates and Stop Updates buttons.
      */
     protected Boolean mRequestingLocationUpdates;
+    protected Boolean mUserStartedTheService;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,6 +116,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         tvSpeedValue = (TextView) findViewById(R.id.tvSpeedValue);
 
         mRequestingLocationUpdates = false;
+        mUserStartedTheService = false;
         mLastUpdateTime = "";
         mLastSpeed = 0f;
 
@@ -131,9 +133,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         if (PermissionUtils.checkForLocationPermission(this)) {
             PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
             setAllButtonsToDisableState();
-        } else if (mRequestingLocationUpdates) {
-            setUpGoogleApiClientIfNeededAndConnected();
-        }
+        } else setUpGoogleApiClientIfNeededAndConnected();
     }
 
     private void addPolylineOnMap(LatLng previousLocation, LatLng location) {
@@ -176,9 +176,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     setButtonsEnabledState();
-                    if (mRequestingLocationUpdates) {
-                        setUpGoogleApiClientIfNeededAndConnected();
-                    }
+                    setUpGoogleApiClientIfNeededAndConnected();
                 }
                 return;
             }
@@ -229,6 +227,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      */
     public void startUpdatesButtonHandler() {
         if (!mRequestingLocationUpdates) {
+            mUserStartedTheService = true;
             setUpGoogleApiClientIfNeededAndConnected();
         }
     }
@@ -291,12 +290,10 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-
     private void startLocationService() {
         Intent locationServiceIntent = new Intent(this, BackgroundLocationService.class);
         startService(locationServiceIntent);
         bindToLocationService();
-        mRequestingLocationUpdates = true;
         setButtonsEnabledState();
     }
 
@@ -335,7 +332,12 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private void setUpGoogleApiClientIfNeededAndConnected() {
         if (mGoogleApiClient == null)
             mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
-        mGoogleApiClient.connect();
+
+        if (mGoogleApiClient.isConnected()) {
+            handleGoogleApiConnection();
+        } else {
+            mGoogleApiClient.connect();
+        }
     }
 
     @Override
@@ -349,13 +351,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceDisconnected(ComponentName name) {
-            Toast.makeText(MainActivity.this, "Service is disconnected", Toast.LENGTH_SHORT).show();
+            //Toast.makeText(MainActivity.this, "Service is disconnected", Toast.LENGTH_SHORT).show();
             mBounded = false;
             mLocationService = null;
         }
 
         public void onServiceConnected(ComponentName name, IBinder service) {
-            Toast.makeText(MainActivity.this, "Service is connected", Toast.LENGTH_SHORT).show();
+            //Toast.makeText(MainActivity.this, "Service is connected", Toast.LENGTH_SHORT).show();
             mBounded = true;
             BackgroundLocationService.LocalBinder mLocalBinder = (BackgroundLocationService.LocalBinder)service;
             mLocationService = mLocalBinder.getServerInstance(MainActivity.this);
@@ -367,17 +369,22 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     public void onConnected(@Nullable Bundle bundle) {
+        handleGoogleApiConnection();
+    }
+
+    private void handleGoogleApiConnection() {
         if (PermissionUtils.checkForLocationPermission(this)) {
             return;
         }
 
-        checkForLocationSettings();
+        if (mUserStartedTheService) {
+            checkForLocationSettings(mUserStartedTheService);
+            mRequestingLocationUpdates = true;
+            setButtonsEnabledState();
+        }
 
         mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
         updateViewAndMap();
-
-       /* mGoogleApiClient.disconnect();
-        mGoogleApiClient = null;*/
     }
 
     private void updateViewAndMap() {
@@ -440,7 +447,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             switch (status.getStatusCode()) {
                 case LocationSettingsStatusCodes.SUCCESS:
                     // All location settings are satisfied. The client can initialize location requests here.
-                    startLocationService();
+                    if (mRequestingLocationUpdates) {
+                        startLocationService();
+                    }
                     break;
                 case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
                     // Location settings are not satisfied. But could be fixed by showing the user
@@ -462,7 +471,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     };
 
 
-    private void checkForLocationSettings() {
+    private void checkForLocationSettings(final Boolean userStartedTheService) {
         LocationSettingsRequest.Builder locationSettingsRequestBuilder = new LocationSettingsRequest.Builder().addLocationRequest(getLocationRequest());
         locationSettingsRequestBuilder.setAlwaysShow(true);
         PendingResult<LocationSettingsResult> result =
@@ -475,7 +484,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 switch (status.getStatusCode()) {
                     case LocationSettingsStatusCodes.SUCCESS:
                         // All location settings are satisfied. The client can initialize location requests here.
-                        startLocationService();
+                        if (userStartedTheService) {
+                            startLocationService();
+                        }
                         break;
                     case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
                         // Location settings are not satisfied. But could be fixed by showing the user
