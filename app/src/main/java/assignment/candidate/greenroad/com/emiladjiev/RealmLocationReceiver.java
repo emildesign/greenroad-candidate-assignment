@@ -20,12 +20,10 @@ public class RealmLocationReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Log.d(TAG, "onReceive() called with: " + "context = [" + context + "], intent = [" + intent + "]");
         // Need to check and grab the Intent's extras like so
         if(LocationResult.hasResult(intent)) {
             this.mLocationResult = LocationResult.extractResult(intent);
             Log.i(TAG, "Location Received: " + this.mLocationResult.toString());
-
             RealmHelper.saveLocationToRealmByCreatingObject(LUSApplication.getInstance().getRealm(), mLocationResult.getLastLocation());
 
             //notify bus of new location received

@@ -22,8 +22,6 @@ import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
 import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.common.api.Status;
-import com.google.android.gms.location.LocationListener;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
@@ -39,16 +37,13 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.squareup.otto.Subscribe;
 
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
-
-import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
+import assignment.candidate.greenroad.com.emiladjiev.helpers.AndroidHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 import io.realm.RealmResults;
 
-public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
+public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private static final String TAG = "MainActivity";
     private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1001;
@@ -242,15 +237,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-
-
-
-
-    /**
-     * Ensures that only one button is enabled at any time. The Start Updates button is enabled
-     * if the user is not requesting location updates. The Stop Updates button is enabled if the
-     * user is requesting location updates.
-     */
     private void setButtonsEnabledState() {
         if (mRequestingLocationUpdates) {
             bEnable.setEnabled(false);
@@ -373,10 +359,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         return cameraPosition;
     }
 
-    /*
-     * Create a new location client, using the enclosing class to
-     * handle callbacks.
-     */
     private void setUpGoogleApiClientIfNeededAndConnected() {
         if (mGoogleApiClient == null)
             mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
@@ -412,9 +394,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     };
 
-    public void handleGetDirectionsResult(ArrayList<LatLng> result) {
-    }
-
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         handleGoogleApiConnection();
@@ -449,42 +428,10 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     @Override
-    public void onConnectionSuspended(int i) {
-
-    }
+    public void onConnectionSuspended(int i) {}
 
     @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-
-    }
-
-    @Override
-    public void onLocationChanged(Location location) {
-        addPolylineOnMap(getLatLngFromLocation(mCurrentLocation), getLatLngFromLocation(location));
-        mCurrentLocation = location;
-        updateViewAndMap();
-    }
-
-    public static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
-    public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS = UPDATE_INTERVAL_IN_MILLISECONDS / 2;
-
-    protected LocationRequest getLocationRequest() {
-        LocationRequest locationRequest = new LocationRequest();
-
-        // Sets the desired interval for active location updates. This interval is
-        // inexact. You may not receive updates at all if no location sources are available, or
-        // you may receive them slower than requested. You may also receive updates faster than
-        // requested if other applications are requesting location at a faster interval.
-        locationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
-
-        // Sets the fastest rate for active location updates. This interval is exact, and your
-        // application will never receive updates faster than this value.
-        locationRequest.setFastestInterval(FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
-
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-
-        return locationRequest;
-    }
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {}
 
     // The callback for the management of the user settings regarding location
     ResultCallback<LocationSettingsResult> mResultCallbackFromSettings = new ResultCallback<LocationSettingsResult>() {
@@ -520,7 +467,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
 
     private void checkForLocationSettings(final Boolean userStartedTheService) {
-        LocationSettingsRequest.Builder locationSettingsRequestBuilder = new LocationSettingsRequest.Builder().addLocationRequest(getLocationRequest());
+        LocationSettingsRequest.Builder locationSettingsRequestBuilder = new LocationSettingsRequest.Builder().addLocationRequest(GoogleApiClientHelper.getLocationRequest(true));
         locationSettingsRequestBuilder.setAlwaysShow(true);
         PendingResult<LocationSettingsResult> result =
                 LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient, locationSettingsRequestBuilder.build());

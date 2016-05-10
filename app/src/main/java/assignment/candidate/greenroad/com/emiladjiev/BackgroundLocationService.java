@@ -6,33 +6,17 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.location.Location;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.app.ActivityCompat;
-import android.util.Log;
-
-
 import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
-
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-
-import assignment.candidate.greenroad.com.emiladjiev.active_android.LocationReceiver;
-import assignment.candidate.greenroad.com.emiladjiev.helpers.Constants;
+import assignment.candidate.greenroad.com.emiladjiev.helpers.AndroidHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
-import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 
 /**
  * BackgroundLocationService used for tracking user location in the background.
@@ -44,29 +28,16 @@ public class BackgroundLocationService extends Service implements
         GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private static final String TAG = "LocationService";
-    /**
-     * The desired interval for location updates. Inexact. Updates may be more or less frequent.
-     */
-    public static final long UPDATE_INTERVAL_IN_MILLISECONDS = 10000;
-
-    /**
-     * The fastest rate for active location updates. Exact. Updates will never be more frequent
-     * than this value.
-     */
-    public static final long FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS =
-            UPDATE_INTERVAL_IN_MILLISECONDS / 2;
-
-
-    private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9002;
-    IBinder mBinder = new LocalBinder();
-
     private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
+
     // Flag that indicates if a request is underway.
     private boolean mInProgress;
     private PowerManager.WakeLock mWakeLock;
     private Boolean servicesAvailable = false;
 
+    // Binder
+    IBinder mBinder = new LocalBinder();
     public class LocalBinder extends Binder {
         public BackgroundLocationService getServerInstance() {
             return BackgroundLocationService.this;
@@ -77,68 +48,15 @@ public class BackgroundLocationService extends Service implements
     public void onCreate() {
         super.onCreate();
         mInProgress = false;
-
-        servicesAvailable = checkPlayServicesAvailable();
-
-        createLocationRequest(true);
-
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(LocationServices.API)
-                .addConnectionCallbacks(this)
-                .addOnConnectionFailedListener(this)
-                .build();
+        servicesAvailable = AndroidHelper.isPlayServicesAvailable(this);
+        mLocationRequest = GoogleApiClientHelper.getLocationRequest(true);
+        setUpGoogleApiClientIfNeeded();
     }
 
-    /**
-     * Sets up the location request. Android has two location request settings:
-     * {@code ACCESS_COARSE_LOCATION} and {@code ACCESS_FINE_LOCATION}. These settings control
-     * the accuracy of the current location. This sample uses ACCESS_FINE_LOCATION, as defined in
-     * the AndroidManifest.xml.
-     * <p/>
-     * When the ACCESS_FINE_LOCATION setting is specified, combined with a fast update
-     * interval (5 seconds), the Fused LUSLocation Provider API returns location updates that are
-     * accurate to within a few feet.
-     * <p/>
-     * These settings are appropriate for mapping applications that show real-time location
-     * updates.
-     */
-    protected void createLocationRequest(boolean isHighAccuracy) {
-        // Create the LocationRequest object
-        mLocationRequest = LocationRequest.create();
-        if (isHighAccuracy) {
-            // Sets the desired interval for active location updates. This interval is
-            // inexact. You may not receive updates at all if no location sources are available, or
-            // you may receive them slower than requested. You may also receive updates faster than
-            // requested if other applications are requesting location at a faster interval.
-            mLocationRequest.setInterval(UPDATE_INTERVAL_IN_MILLISECONDS);
-
-            // Sets the fastest rate for active location updates. This interval is exact, and your
-            // application will never receive updates faster than this value.
-            mLocationRequest.setFastestInterval(FASTEST_UPDATE_INTERVAL_IN_MILLISECONDS);
-
-            mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        } else {
-            // Use high accuracy
-            mLocationRequest.setPriority(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY);
-            // Set the update interval to 5 seconds
-            mLocationRequest.setInterval(Constants.UPDATE_INTERVAL);
-            // Set the fastest update interval to 1 second
-            mLocationRequest.setFastestInterval(Constants.FASTEST_INTERVAL);
-        }
+    @Override
+    public IBinder onBind(Intent intent) {
+        return mBinder;
     }
-
-    private boolean checkPlayServicesAvailable() {
-        GoogleApiAvailability googleAPI = GoogleApiAvailability.getInstance();
-        int result = googleAPI.isGooglePlayServicesAvailable(this);
-        if (result != ConnectionResult.SUCCESS) {
-            if (googleAPI.isUserResolvableError(result)) {
-                // googleAPI.getErrorDialog(this, result, PLAY_SERVICES_RESOLUTION_REQUEST).show();
-            }
-            return false;
-        }
-        return true;
-    }
-
 
     public int onStartCommand(Intent intent, int flags, int startId) {
         super.onStartCommand(intent, flags, startId);
@@ -171,47 +89,6 @@ public class BackgroundLocationService extends Service implements
         return START_STICKY;
     }
 
-    /*
-     * Create a new location client, using the enclosing class to
-     * handle callbacks.
-     */
-    private void setUpGoogleApiClientIfNeeded() {
-        if (mGoogleApiClient == null)
-            mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return mBinder;
-    }
-
-    public String getTime() {
-        SimpleDateFormat mDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        return mDateFormat.format(new Date());
-    }
-
-    public void appendLog(String text, String filename) {
-        File logFile = new File(filename);
-        if (!logFile.exists()) {
-            try {
-                logFile.createNewFile();
-            } catch (IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-        try {
-            //BufferedWriter for performance, true to set append to file flag
-            BufferedWriter buf = new BufferedWriter(new FileWriter(logFile, true));
-            buf.append(text);
-            buf.newLine();
-            buf.close();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-    }
-
     @Override
     public void onDestroy() {
         // Turn off the request flag
@@ -222,29 +99,31 @@ public class BackgroundLocationService extends Service implements
             this.mGoogleApiClient.unregisterConnectionCallbacks(this);
             this.mGoogleApiClient.unregisterConnectionFailedListener(this);
             this.mGoogleApiClient.disconnect();
-            // Destroy the current location client
             this.mGoogleApiClient = null;
         }
-        // Display the connection status
-        // Toast.makeText(this, DateFormat.getDateTimeInstance().format(new Date()) + ":
-        // Disconnected. Please re-connect.", Toast.LENGTH_SHORT).show();
 
         if (this.mWakeLock != null) {
             this.mWakeLock.release();
             this.mWakeLock = null;
         }
 
-        //appendLog(DateFormat.getDateTimeInstance().format(new Date()) + ": Stopped", Constants.LOG_FILE);
+        //Toast.makeText(this, DateFormat.getDateTimeInstance().format(new Date()) + " : Disconnected", Toast.LENGTH_SHORT).show();
         super.onDestroy();
     }
 
     /*
-     * Called by LUSLocation Services when the request to connect the
-     * client finishes successfully. At this point, you can
-     * request the current location or start periodic updates
+     * Create a new location client, using the enclosing class to
+     * handle callbacks.
      */
+    private void setUpGoogleApiClientIfNeeded() {
+        if (mGoogleApiClient == null)
+            mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
+    }
+
+
     @Override
     public void onConnected(Bundle bundle) {
+        //Toast.makeText(this, DateFormat.getDateTimeInstance().format(new Date()) + " : Connected", Toast.LENGTH_SHORT).show();
         startLocationUpdates();
     }
 
@@ -267,36 +146,15 @@ public class BackgroundLocationService extends Service implements
     protected void stopLocationUpdates() {
         Intent intent = new Intent(this, RealmLocationReceiver.class);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
-        // It is a good practice to remove location requests when the activity is in a paused or
-        // stopped state. Doing so helps battery performance and is especially
-        // recommended in applications that request frequent location updates.
         LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, pendingIntent);
-    }
-
-    protected Location getLastKnownLocation() {
-        if (PermissionUtils.checkForLocationPermission(this)) {
-            return null;
-        }
-
-        Location mLastLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        return mLastLocation;
     }
 
     @Override
     public void onConnectionSuspended(int i) {
-        /*// Turn off the request flag
         mInProgress = false;
-        // Destroy the current location client
         mGoogleApiClient = null;
-        // Display the connection status
-        // Toast.makeText(this, DateFormat.getDateTimeInstance().format(new Date()) + ": Disconnected. Please re-connect.", Toast.LENGTH_SHORT).show();
-        appendLog(DateFormat.getDateTimeInstance().format(new Date()) + ": Disconnected", Constants.LOG_FILE);*/
     }
 
-    /*
-     * Called by LUSLocation Services if the attempt to
-     * LUSLocation Services fails.
-     */
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {
         mInProgress = false;
@@ -308,14 +166,7 @@ public class BackgroundLocationService extends Service implements
          * error.
          */
         if (connectionResult.hasResolution()) {
-
             // If no resolution is available, display an error dialog
-        } else {
-
-        }
-    }
-
-    public LocationRequest getLocationRequest() {
-        return mLocationRequest;
+        } else {}
     }
 }
