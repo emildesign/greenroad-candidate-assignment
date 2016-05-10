@@ -1,9 +1,13 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.helpers;
 
 import android.annotation.TargetApi;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Build;
 import android.provider.Settings;
+
+import assignment.candidate.greenroad.com.emiladjiev.BackgroundLocationService;
 
 /**
  * Created by Emil on 10/05/2016.
@@ -26,6 +30,12 @@ public class AndroidHelper {
             return Settings.Global.getInt(context.getContentResolver(),
                     Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
         }
+    }
+
+    public static ComponentName startLocationServiceUsingComponentName(Context context) {
+        ComponentName comp = new ComponentName(context.getPackageName(), BackgroundLocationService.class.getName());
+        ComponentName service = context.startService(new Intent().setComponent(comp));
+        return service;
     }
 
 

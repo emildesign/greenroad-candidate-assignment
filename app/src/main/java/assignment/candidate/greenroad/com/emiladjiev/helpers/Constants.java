@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.helpers;
 
 /**
  * Created by Emil on 09/05/2016.

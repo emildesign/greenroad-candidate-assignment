@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.helpers;
 
 import android.Manifest;
 import android.app.Activity;
