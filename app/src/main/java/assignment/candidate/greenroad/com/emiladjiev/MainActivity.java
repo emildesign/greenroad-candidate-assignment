@@ -16,7 +16,6 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -43,6 +42,9 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+
+import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
+import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, LocationListener {
 
@@ -148,13 +150,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     protected void onStart() {
-        LocationUpdatesApplication.getInstance().getBus().register(this);
+        LUSApplication.getInstance().getBus().register(this);
         super.onStart();
     }
 
     @Override
     protected void onStop() {
-        LocationUpdatesApplication.getInstance().getBus().unregister(this);
+        LUSApplication.getInstance().getBus().unregister(this);
         super.onStop();
 
         if (mRequestingLocationUpdates) {
@@ -192,7 +194,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private void addLocationsFromDBToMap() {
         if (mMap != null) {
             mMap.clear();
-            List<LuLocation> allSavedLocations = LocationUpdatesApplication.getInstance().getAllSavedLocations();
+            List<LUSLocation> allSavedLocations = LUSApplication.getInstance().getAllSavedLocations();
             for (int i = 0; i < allSavedLocations.size() - 1; i++) {
                 mCurrentLocation = allSavedLocations.get(i + 1).getLocation();
                 addPolylineOnMap(allSavedLocations.get(i).getLatLong(), allSavedLocations.get(i + 1).getLatLong());

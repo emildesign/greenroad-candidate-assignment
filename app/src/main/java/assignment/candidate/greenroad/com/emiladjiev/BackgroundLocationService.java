@@ -3,7 +3,6 @@ package assignment.candidate.greenroad.com.emiladjiev;
 import android.Manifest;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -21,7 +20,6 @@ import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationListener;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 
 import java.io.BufferedWriter;
@@ -30,6 +28,10 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+
+import assignment.candidate.greenroad.com.emiladjiev.helpers.Constants;
+import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
+import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 
 /**
  * BackgroundLocationService used for tracking user location in the background.
@@ -95,7 +97,7 @@ public class BackgroundLocationService extends Service implements
      * the AndroidManifest.xml.
      * <p/>
      * When the ACCESS_FINE_LOCATION setting is specified, combined with a fast update
-     * interval (5 seconds), the Fused LuLocation Provider API returns location updates that are
+     * interval (5 seconds), the Fused LUSLocation Provider API returns location updates that are
      * accurate to within a few feet.
      * <p/>
      * These settings are appropriate for mapping applications that show real-time location
@@ -248,7 +250,7 @@ public class BackgroundLocationService extends Service implements
     }
 
     /*
-     * Called by LuLocation Services when the request to connect the
+     * Called by LUSLocation Services when the request to connect the
      * client finishes successfully. At this point, you can
      * request the current location or start periodic updates
      */
@@ -304,8 +306,8 @@ public class BackgroundLocationService extends Service implements
     }
 
     /*
-     * Called by LuLocation Services if the attempt to
-     * LuLocation Services fails.
+     * Called by LUSLocation Services if the attempt to
+     * LUSLocation Services fails.
      */
     @Override
     public void onConnectionFailed(ConnectionResult connectionResult) {

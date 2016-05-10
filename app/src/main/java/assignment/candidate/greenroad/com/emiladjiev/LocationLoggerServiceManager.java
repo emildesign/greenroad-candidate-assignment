@@ -13,6 +13,7 @@ import android.util.Log;
 
 public class LocationLoggerServiceManager extends BroadcastReceiver {
 
+    protected final static String UPDATES_KEY = "updates_key";
     private SharedPreferences mPrefs;
     public static final String TAG = "LoggerServiceManager";
 
@@ -21,20 +22,15 @@ public class LocationLoggerServiceManager extends BroadcastReceiver {
         // Make sure we are getting the right intent
         if( "android.intent.action.BOOT_COMPLETED".equals(intent.getAction())) {
             boolean mUpdatesRequested = false;
-            // Open the shared preferences
-            mPrefs = context.getSharedPreferences("SharedPreferences",
-                    Context.MODE_PRIVATE);
-	        /*
-	         * Get any previous setting for location updates
-	         * Gets "false" if an error occurs
-	         */
-            if (mPrefs.contains("KEY_UPDATES_ON")) {
-                mUpdatesRequested = mPrefs.getBoolean("KEY_UPDATES_ON", false);
+
+            //checking shared preferences for updating key.
+            mPrefs = context.getSharedPreferences("SharedPreferences", Context.MODE_PRIVATE);
+            if (mPrefs.contains(UPDATES_KEY)) {
+                mUpdatesRequested = mPrefs.getBoolean(UPDATES_KEY, false);
             }
             if(mUpdatesRequested){
                 ComponentName comp = new ComponentName(context.getPackageName(), BackgroundLocationService.class.getName());
                 ComponentName service = context.startService(new Intent().setComponent(comp));
-
                 if (null == service){
                     // something really wrong here
                     Log.e(TAG, "Could not start service " + comp.toString());
