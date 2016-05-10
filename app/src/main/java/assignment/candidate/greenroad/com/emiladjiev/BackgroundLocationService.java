@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import assignment.candidate.greenroad.com.emiladjiev.active_android.LocationReceiver;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.Constants;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
@@ -40,7 +41,7 @@ import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
  * @author Emil on 09/05/2016.
  */
 public class BackgroundLocationService extends Service implements
-        LocationListener, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
     private static final String TAG = "LocationService";
     /**
@@ -65,11 +66,9 @@ public class BackgroundLocationService extends Service implements
     private boolean mInProgress;
     private PowerManager.WakeLock mWakeLock;
     private Boolean servicesAvailable = false;
-    private LocationListener mListener;
 
     public class LocalBinder extends Binder {
-        public BackgroundLocationService getServerInstance(LocationListener listener) {
-            BackgroundLocationService.this.mListener = listener;
+        public BackgroundLocationService getServerInstance() {
             return BackgroundLocationService.this;
         }
     }
@@ -179,16 +178,6 @@ public class BackgroundLocationService extends Service implements
     private void setUpGoogleApiClientIfNeeded() {
         if (mGoogleApiClient == null)
             mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
-    }
-
-    // Define the callback method that receives location updates
-    @Override
-    public void onLocationChanged(Location location) {
-        // Report to the UI that the location was updated
-        String msg = Double.toString(location.getLatitude()) + "," + Double.toString(location.getLongitude());
-        Log.d("debug", msg);
-        // Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-        //appendLog(msg, Constants.LOCATION_FILE);
     }
 
     @Override

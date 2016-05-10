@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 
@@ -164,11 +165,33 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    @Subscribe
-    public void onLocationResultReceived(LocationResult locationResult) {
-        mCurrentLocation = locationResult.getLastLocation();
-        updateViewAndMap();
-
+    /**
+     * Used to check the result of the check of the user location settings
+     *
+     * @param requestCode code of the request made
+     * @param resultCode code of the result of that request
+     * @param intent intent with further information
+     */
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        //final LocationSettingsStates states = LocationSettingsStates.fromIntent(intent);
+        switch (requestCode) {
+            case REQUEST_CHECK_SETTINGS:
+                switch (resultCode) {
+                    case Activity.RESULT_OK:
+                        // All required changes were successfully made
+                        if (mGoogleApiClient.isConnected()) {
+                            startLocationService();
+                        }
+                        break;
+                    case Activity.RESULT_CANCELED:
+                        // The user was asked to change settings, but chose not to
+                        break;
+                    default:
+                        break;
+                }
+                break;
+        }
     }
 
     @Override
@@ -189,6 +212,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         addLocationsFromDBToMap();
+    }
+
+
+    @Subscribe
+    public void onLocationResultReceived(LocationResult locationResult) {
+        mCurrentLocation = locationResult.getLastLocation();
+        updateViewAndMap();
     }
 
     private void addLocationsFromDBToMap() {
@@ -362,7 +392,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             //Toast.makeText(MainActivity.this, "Service is connected", Toast.LENGTH_SHORT).show();
             mBounded = true;
             BackgroundLocationService.LocalBinder mLocalBinder = (BackgroundLocationService.LocalBinder)service;
-            mLocationService = mLocalBinder.getServerInstance(MainActivity.this);
+            mLocationService = mLocalBinder.getServerInstance();
         }
     };
 
@@ -508,34 +538,5 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 }
             }
         });
-    }
-
-    /**
-     * Used to check the result of the check of the user location settings
-     *
-     * @param requestCode code of the request made
-     * @param resultCode code of the result of that request
-     * @param intent intent with further information
-     */
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
-        //final LocationSettingsStates states = LocationSettingsStates.fromIntent(intent);
-        switch (requestCode) {
-            case REQUEST_CHECK_SETTINGS:
-                switch (resultCode) {
-                    case Activity.RESULT_OK:
-                        // All required changes were successfully made
-                        if (mGoogleApiClient.isConnected()) {
-                            startLocationService();
-                        }
-                        break;
-                    case Activity.RESULT_CANCELED:
-                        // The user was asked to change settings, but chose not to
-                        break;
-                    default:
-                        break;
-                }
-                break;
-        }
     }
 }
