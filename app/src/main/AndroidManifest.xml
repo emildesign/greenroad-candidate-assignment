@@ -14,10 +14,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="@string/google_maps_key" />
-
         <activity
             android:name=".MainActivity"
             android:label="@string/title_activity_main">
@@ -27,6 +23,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".BackgroundLocationService"
+            android:exported="false" >
+        </service>
 
         <receiver android:name=".LocationLoggerServiceManager"
             android:enabled="true"
@@ -38,20 +39,24 @@
             </intent-filter>
         </receiver>
 
-        <receiver android:name="RealmLocationReceiver" android:label="LocationReceiver"/>
-        <service android:name=".BackgroundLocationService" android:exported="false" />
-
-        <!-- ATTENTION: This was auto-generated to add Google Play services to your project for
-        App Indexing.  See https://g.co/AppIndexing/AndroidStudio for more information. -->
-        <meta-data
-            android:name="com.google.android.gms.version"
-            android:value="@integer/google_play_services_version" />
+        <receiver
+            android:name="RealmLocationReceiver"
+            android:label="LocationReceiver">
+        </receiver>
 
         <!-- Active Android models declarations -->
         <meta-data
             android:name="AA_MODELS"
             android:value="assignment.candidate.greenroad.com.emiladjiev.LuLocation" />
 
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_key" />
+
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
     </application>
 
 </manifest>

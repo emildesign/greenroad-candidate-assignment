@@ -145,18 +145,15 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     protected void onStart() {
-        LUSApplication.getInstance().getBus().register(this);
         super.onStart();
+        LUSApplication.getInstance().getBus().register(this);
     }
 
     @Override
     protected void onStop() {
         LUSApplication.getInstance().getBus().unregister(this);
+        unbindFromLocationService();
         super.onStop();
-
-        if (mRequestingLocationUpdates) {
-            unbindFromLocationService();
-        }
     }
 
     @Override
@@ -342,7 +339,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void unbindFromLocationService() {
-        unbindService(mConnection);
+        if (mBounded) {
+            unbindService(mConnection);
+        }
     }
 
     public void zoomInMapOnMyCurrentLocationWithZoom(float zoomLevel, GoogleMap map, Location location) {
@@ -479,9 +478,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 switch (status.getStatusCode()) {
                     case LocationSettingsStatusCodes.SUCCESS:
                         // All location settings are satisfied. The client can initialize location requests here.
-                        if (userStartedTheService) {
-                            startLocationService();
-                        }
+                        startLocationService();
+
                         break;
                     case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
                         // Location settings are not satisfied. But could be fixed by showing the user
