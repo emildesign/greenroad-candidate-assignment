@@ -61,3 +61,4 @@ gradlew
 atlassian-ide-plugin.xml
 gradlew.bat
 app/src/debug/res/values/google_maps_api.xml
+not_used_classes/LocationListenerService.java
