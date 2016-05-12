@@ -3,7 +3,7 @@ This is a job interview project.
 
 Main features:
 
-1. A service that uses the new LocationService.API from google play services;
+1. A service that uses ReactiveLocation library that uses the new LocationService.API from google play services;
 
 2. Service can be controlled from the main activity.
 
