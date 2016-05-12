@@ -46,16 +46,17 @@ import assignment.candidate.greenroad.com.emiladjiev.helpers.MapHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 import assignment.candidate.greenroad.com.emiladjiev.rx_helpers.DisplayTextOnViewAction;
 import assignment.candidate.greenroad.com.emiladjiev.rx_helpers.LocationToStringsArrayListFunc;
+import io.realm.Realm;
 import io.realm.RealmResults;
 import rx.Observable;
 import rx.Subscription;
 import rx.functions.Action1;
+import rx.subscriptions.CompositeSubscription;
 
-public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+public class MainActivity extends FragmentActivity implements OnMapReadyCallback {
 
     private static final String TAG = "MainActivity";
-    private static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1001;
-    //private static final int REQUEST_CHECK_SETTINGS = 1002;
+    protected static final int MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION = 1001;
     protected static final int REQUEST_CHECK_SETTINGS = 0x1;
 
     // Keys for storing activity state in the Bundle.
@@ -63,7 +64,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     protected final static String LOCATION_KEY = "location_key";
     protected final static String LAST_UPDATED_TIME_STRING_KEY = "last_updated_time_string_key";
     protected final static String LAST_UPDATED_SPEED_FLOAT_KEY = "last_updated_spped_float_key";
-
 
     private SupportMapFragment mMapFragment;
     private GoogleMap mMap;
@@ -75,12 +75,14 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private TextView tvSpeedValue;
     private boolean mBounded;
     private BackgroundLocationService mLocationService;
-    private GoogleApiClient mGoogleApiClient;
     private Observable<Location> mLocationUpdatesObservable;
-    private Subscription mLastKnownLocationSubscription;
-    private Subscription mUpdatableLocationSubscription;
+    private CompositeSubscription mCompositeLocationSubscription;
     private Observable<ArrayList<String>> mSharedLocationUpdatesArrayObservable;
     private Subscription mLatitudeSubscription, mLongitudeSubscription, mLastUpdateSubscription, mSpeedSubscription;
+
+    private Subscription mLastKnownLocationSubscription;
+    private Subscription mUpdatableLocationSubscription;
+    private Observable<Location> mLastKnownLocationObservable;
 
     /**
      * Represents a geographical location.
@@ -98,12 +100,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      * Start Updates and Stop Updates buttons.
      */
     protected Boolean mRequestingLocationUpdates;
-    protected Boolean mUserStartedTheService;
+    private int mLocationCounter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         mMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mMapFragment.getMapAsync(this);
 
@@ -118,9 +121,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         bDisable.setOnClickListener(v -> stopUpdatesButtonHandler());
 
         mRequestingLocationUpdates = false;
-        mUserStartedTheService = false;
         mLastUpdateTime = "";
         mLastSpeed = 0f;
+        mLocationCounter = 0;
 
         // Update values using data stored in the Bundle of save instance state.
         updateValuesFromBundle(savedInstanceState);
@@ -130,10 +133,9 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     protected void onResume() {
         super.onResume();
-        addLocationsFromRealmDBToMap();
         if (PermissionUtils.checkForLocationPermission(this)) {
-            PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
             setAllButtonsToDisableState();
+            PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         } else startLocationService();
     }
 
@@ -145,6 +147,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     protected void onStop() {
+        unsubscribeAllSubscriptions();
         LUSApplication.getInstance().getBus().unregister(this);
         unbindFromLocationService();
         super.onStop();
@@ -157,10 +160,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             case REQUEST_CHECK_SETTINGS:
                 switch (resultCode) {
                     case Activity.RESULT_OK:
-                        // All required changes were successfully made
-                        if (mGoogleApiClient.isConnected()) {
-                            startLocationService();
-                        }
+                        startLocationService();
                         break;
                     case Activity.RESULT_CANCELED:
                         // The user was asked to change settings, but chose not to
@@ -179,7 +179,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     setButtonsEnabledState();
-                    setUpGoogleApiClientIfNeededAndConnected();
+                    startLocationService();
                 }
                 return;
             }
@@ -189,38 +189,22 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-        //addLocationsFromActiveAndroidDBToMap();
         addLocationsFromRealmDBToMap();
     }
-
-    @Subscribe
-    public void onLocationResultReceived(LocationResult locationResult) {
-        Location location = locationResult.getLastLocation();
-        if (location != null && mCurrentLocation != null) {
-            MapHelper.addPolylineOnMap(mMap, MapHelper.getLatLngFromLocation(mCurrentLocation), MapHelper.getLatLngFromLocation(location));
-            mCurrentLocation = location;
-            updateViewAndMap();
-        } else if (location != null) {
-            mCurrentLocation = location;
-            updateViewAndMap();
-        }
-    }
-
-    /*private void addLocationsFromActiveAndroidDBToMap() {
-        if (mMap != null) {
-            mMap.clear();
-            List<LUSLocation> allSavedLocations = LUSApplication.getInstance().getAllActiveAndroidSavedLocations();
-            for (int i = 0; i < allSavedLocations.size() - 1; i++) {
-                mCurrentLocation = allSavedLocations.get(i + 1).getLocation();
-                addPolylineOnMap(allSavedLocations.get(i).getLatLong(), allSavedLocations.get(i + 1).getLatLong());
-            }
-        }
-    }*/
 
     private void addLocationsFromRealmDBToMap() {
         if (mMap != null) {
             mMap.clear();
             RealmResults<RealmLocation> allRealmLocations = LUSApplication.getInstance().getAllRealmLocations();
+
+            if (allRealmLocations.size() > 5000) {
+                Realm realm = LUSApplication.getInstance().getRealm();
+                realm.beginTransaction();
+                realm.deleteAll();
+                realm.commitTransaction();
+                allRealmLocations = LUSApplication.getInstance().getAllRealmLocations();
+            }
+
             for (int i = 0; i < allRealmLocations.size() - 1; i++) {
                 mCurrentLocation = allRealmLocations.get(i + 1).getLocation();
                 MapHelper.addPolylineOnMap(mMap, allRealmLocations.get(i).getLatLong(), allRealmLocations.get(i + 1).getLatLong());
@@ -249,8 +233,8 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
      */
     public void startUpdatesButtonHandler() {
         if (!mRequestingLocationUpdates) {
-            mUserStartedTheService = true;
-            setUpGoogleApiClientIfNeededAndConnected();
+            mRequestingLocationUpdates = true;
+            subscribeToLocationService();
         }
     }
 
@@ -274,6 +258,149 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         tvLongitudeValue.setText(String.format("%s", mCurrentLocation != null ? "" + mCurrentLocation.getLongitude() : ""));
         tvLastUpdateValue.setText(String.format("%s", mLastUpdateTime));
         tvSpeedValue.setText(String.valueOf(mLastSpeed));
+    }
+
+    private void startLocationService() {
+        Intent locationServiceIntent = new Intent(this, BackgroundLocationService.class);
+        startService(locationServiceIntent);
+        bindToLocationService();
+    }
+
+    private void stopLocationService() {
+        unsubscribeAllSubscriptions();
+        unbindFromLocationService();
+        mLocationService.stopServiceSubscription();
+        stopService(new Intent(this, BackgroundLocationService.class));
+        mBounded = false;
+    }
+
+    public void handleNewLocation(Location location) {
+        if (location != null && mCurrentLocation != null) {
+            MapHelper.addPolylineOnMap(mMap, MapHelper.getLatLngFromLocation(mCurrentLocation), MapHelper.getLatLngFromLocation(location));
+            mCurrentLocation = location;
+        } else if (location != null) {
+            mCurrentLocation = location;
+        }
+
+        if (mLocationCounter == 0) {
+            MapHelper.zoomInMapOnMyCurrentLocationWithZoom(16, mMap, mCurrentLocation);
+            mLocationCounter++;
+        } else if (mLocationCounter > 9) {
+            mLocationCounter = 0;
+        } else {
+            mLocationCounter++;
+        }
+    }
+
+    private void unsubscribeAllSubscriptions() {
+        if (mCompositeLocationSubscription != null && mCompositeLocationSubscription.hasSubscriptions()) {
+            mCompositeLocationSubscription.unsubscribe();
+        }
+    }
+
+    private void subscribeToLocationService() {
+        setButtonsEnabledState();
+        mLocationUpdatesObservable = mLocationService.getLocationUpdatesObservable();
+        mSharedLocationUpdatesArrayObservable = mLocationUpdatesObservable
+                .map(location -> {
+                    handleNewLocation(location);
+                    return location;
+                })
+                .map(new LocationToStringsArrayListFunc()).share();
+
+        mLatitudeSubscription = mSharedLocationUpdatesArrayObservable
+                .map(stringArrayList -> stringArrayList.get(0))
+                .subscribe(s -> tvLatitudeValue.setText(s), new ErrorHandler());
+
+        mLongitudeSubscription = mSharedLocationUpdatesArrayObservable
+                .map(new ListItemAtIndexFunc(1))
+                .subscribe(new DisplayTextOnViewAction(tvLongitudeValue), new ErrorHandler());
+
+        mLastUpdateSubscription = mSharedLocationUpdatesArrayObservable
+                .map(stringArrayList -> stringArrayList.get(2))
+                .map(s -> {
+                    SimpleDateFormat outFmt = new SimpleDateFormat("HH:mm:ss");
+                    Date date = new Date(Long.valueOf(s));
+                    mLastUpdateTime = outFmt.format(date);
+                    return mLastUpdateTime;
+                })
+                .subscribe(new DisplayTextOnViewAction(tvLastUpdateValue), new ErrorHandler());
+
+        mSpeedSubscription = mSharedLocationUpdatesArrayObservable
+                .map(new ListItemAtIndexFunc(3))
+                .subscribe(new DisplayTextOnViewAction(tvSpeedValue), new ErrorHandler());
+
+        mCompositeLocationSubscription = new CompositeSubscription(mLatitudeSubscription, mLongitudeSubscription, mLastUpdateSubscription, mSpeedSubscription/*, mLastKnownLocationSubscription*/);
+    }
+
+    private class ErrorHandler implements Action1<Throwable> {
+        @Override
+        public void call(Throwable throwable) {
+            Toast.makeText(MainActivity.this, "Error occurred.", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "Error occurred", throwable);
+        }
+    }
+
+    private void bindToLocationService() {
+        Intent mIntent = new Intent(this, BackgroundLocationService.class);
+        bindService(mIntent, mConnection, BIND_AUTO_CREATE);
+    }
+
+    private void unbindFromLocationService() {
+        if (mBounded) {
+            unbindService(mConnection);
+        }
+    }
+
+    ServiceConnection mConnection = new ServiceConnection() {
+        public void onServiceDisconnected(ComponentName name) {
+            //Toast.makeText(MainActivity.this, "Service is disconnected", Toast.LENGTH_SHORT).show();
+            mBounded = false;
+            mLocationService = null;
+            setButtonsEnabledState();
+        }
+
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            //Toast.makeText(MainActivity.this, "Service is connected", Toast.LENGTH_SHORT).show();
+            mBounded = true;
+            BackgroundLocationService.LocalBinder mLocalBinder = (BackgroundLocationService.LocalBinder)service;
+            mLocationService = mLocalBinder.getServerInstance();
+            mLocationService.getLocationSettingsResult()
+                    .doOnNext(locationSettingsResult -> {
+                        Status status = locationSettingsResult.getStatus();
+                        if (status.getStatusCode() == LocationSettingsStatusCodes.SUCCESS) {
+                            subscribeToLocationService();
+                        } else if (status.getStatusCode() == LocationSettingsStatusCodes.RESOLUTION_REQUIRED) {
+                            try {
+                                status.startResolutionForResult(MainActivity.this, REQUEST_CHECK_SETTINGS);
+                            } catch (IntentSender.SendIntentException th) {
+                                Log.e("MainActivity", "Error opening settings activity.", th);
+                            }
+                        } else if (status.getStatusCode() == LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE) {
+                            Log.e(TAG, "Settings change unavailable. We have no way to fix the settings so we won't show the dialog.");
+                        }
+                    });
+
+          /*mLastKnownLocationObservable = mLocationService.getLocationProvider().getLastKnownLocation();
+            mLastKnownLocationSubscription = mLastKnownLocationObservable
+                    .map(new LocationToStringFunc())
+                    .subscribe(new DisplayTextOnViewAction(lastKnownLocationView), new ErrorHandler());
+            */
+
+            if (mRequestingLocationUpdates) {
+                subscribeToLocationService();
+            }
+            setButtonsEnabledState();
+        }
+    };
+
+    @Override
+    protected void onSaveInstanceState(Bundle savedInstanceState) {
+        savedInstanceState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY, mRequestingLocationUpdates);
+        savedInstanceState.putParcelable(LOCATION_KEY, mCurrentLocation);
+        savedInstanceState.putString(LAST_UPDATED_TIME_STRING_KEY, mLastUpdateTime);
+        savedInstanceState.putFloat(LAST_UPDATED_SPEED_FLOAT_KEY, mLastSpeed);
+        super.onSaveInstanceState(savedInstanceState);
     }
 
     /**
@@ -313,196 +440,5 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             bindToLocationService();
             mRequestingLocationUpdates = true;
         }
-    }
-
-    private void startLocationService() {
-        Intent locationServiceIntent = new Intent(this, BackgroundLocationService.class);
-        startService(locationServiceIntent);
-        bindToLocationService();
-        setButtonsEnabledState();
-    }
-
-    private class ErrorHandler implements Action1<Throwable> {
-        @Override
-        public void call(Throwable throwable) {
-            Toast.makeText(MainActivity.this, "Error occurred.", Toast.LENGTH_SHORT).show();
-            Log.d(TAG, "Error occurred", throwable);
-        }
-    }
-
-    private void stopLocationService() {
-        unbindFromLocationService();
-        stopService(new Intent(this, BackgroundLocationService.class));
-    }
-
-    private void bindToLocationService() {
-        Intent mIntent = new Intent(this, BackgroundLocationService.class);
-        bindService(mIntent, mConnection, BIND_AUTO_CREATE);
-    }
-
-    private void unbindFromLocationService() {
-        if (mBounded) {
-            unbindService(mConnection);
-        }
-    }
-
-    private void setUpGoogleApiClientIfNeededAndConnected() {
-        if (mGoogleApiClient == null)
-            mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
-
-        if (mGoogleApiClient.isConnected()) {
-            handleGoogleApiConnection();
-        } else {
-            mGoogleApiClient.connect();
-        }
-    }
-
-    @Override
-    protected void onSaveInstanceState(Bundle savedInstanceState) {
-        savedInstanceState.putBoolean(REQUESTING_LOCATION_UPDATES_KEY, mRequestingLocationUpdates);
-        savedInstanceState.putParcelable(LOCATION_KEY, mCurrentLocation);
-        savedInstanceState.putString(LAST_UPDATED_TIME_STRING_KEY, mLastUpdateTime);
-        savedInstanceState.putFloat(LAST_UPDATED_SPEED_FLOAT_KEY, mLastSpeed);
-        super.onSaveInstanceState(savedInstanceState);
-    }
-
-    ServiceConnection mConnection = new ServiceConnection() {
-        public void onServiceDisconnected(ComponentName name) {
-            //Toast.makeText(MainActivity.this, "Service is disconnected", Toast.LENGTH_SHORT).show();
-            mBounded = false;
-            mLocationService = null;
-        }
-
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            //Toast.makeText(MainActivity.this, "Service is connected", Toast.LENGTH_SHORT).show();
-            mBounded = true;
-            BackgroundLocationService.LocalBinder mLocalBinder = (BackgroundLocationService.LocalBinder)service;
-            mLocationService = mLocalBinder.getServerInstance();
-            mLocationUpdatesObservable = mLocationService.getLocationUpdatesObservable();
-            mSharedLocationUpdatesArrayObservable = mLocationUpdatesObservable
-                    .map(new LocationToStringsArrayListFunc()).share();
-
-            mLatitudeSubscription = mSharedLocationUpdatesArrayObservable
-                    .map(new ListItemAtIndexFunc(0))
-                    .subscribe(new DisplayTextOnViewAction(tvLatitudeValue), new ErrorHandler());
-
-            mLongitudeSubscription = mSharedLocationUpdatesArrayObservable
-                    .map(new ListItemAtIndexFunc(1))
-                    .subscribe(new DisplayTextOnViewAction(tvLongitudeValue), new ErrorHandler());
-
-            mLastUpdateSubscription = mSharedLocationUpdatesArrayObservable
-                    .map(new ListItemAtIndexFunc(2))
-                    .subscribe(new DisplayTextOnViewAction(tvLastUpdateValue), new ErrorHandler());
-
-            mSpeedSubscription = mSharedLocationUpdatesArrayObservable
-                    .map(new ListItemAtIndexFunc(3))
-                    .subscribe(new DisplayTextOnViewAction(tvSpeedValue), new ErrorHandler());
-        }
-    };
-
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        handleGoogleApiConnection();
-    }
-
-    private void handleGoogleApiConnection() {
-        if (PermissionUtils.checkForLocationPermission(this)) {
-            return;
-        }
-
-        if (mUserStartedTheService) {
-            checkForLocationSettings(mUserStartedTheService);
-            mRequestingLocationUpdates = true;
-            setButtonsEnabledState();
-        }
-
-        mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
-        updateViewAndMap();
-    }
-
-    private void updateViewAndMap() {
-        if (mCurrentLocation != null) {
-            SimpleDateFormat outFmt = new SimpleDateFormat("HH:mm:ss");
-            Date date = new Date(mCurrentLocation.getTime());
-            mLastUpdateTime = outFmt.format(date);
-
-            mLastSpeed = mCurrentLocation.getSpeed();
-
-            updateUI();
-            MapHelper.zoomInMapOnMyCurrentLocationWithZoom(16, mMap, mCurrentLocation);
-        }
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {}
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {}
-
-    // The callback for the management of the user settings regarding location
-    ResultCallback<LocationSettingsResult> mResultCallbackFromSettings = new ResultCallback<LocationSettingsResult>() {
-        @Override
-        public void onResult(LocationSettingsResult result) {
-            final Status status = result.getStatus();
-            //final LocationSettingsStates locationSettingsStates = result.getLocationSettingsStates();
-            switch (status.getStatusCode()) {
-                case LocationSettingsStatusCodes.SUCCESS:
-                    // All location settings are satisfied. The client can initialize location requests here.
-                    if (mRequestingLocationUpdates) {
-                        startLocationService();
-                    }
-                    break;
-                case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                    // Location settings are not satisfied. But could be fixed by showing the user
-                    // a dialog.
-                    try {
-                        // Show the dialog by calling startResolutionForResult(),
-                        // and check the result in onActivityResult().
-                        status.startResolutionForResult(MainActivity.this,
-                                REQUEST_CHECK_SETTINGS);
-                    } catch (IntentSender.SendIntentException e) {
-                        // Ignore the error.
-                    }
-                    break;
-                case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                    Log.e(TAG, "Settings change unavailable. We have no way to fix the settings so we won't show the dialog.");
-                    break;
-            }
-        }
-    };
-
-    private void checkForLocationSettings(final Boolean userStartedTheService) {
-        LocationSettingsRequest.Builder locationSettingsRequestBuilder = new LocationSettingsRequest.Builder().addLocationRequest(GoogleApiClientHelper.getLocationRequest(true));
-        locationSettingsRequestBuilder.setAlwaysShow(true);
-        PendingResult<LocationSettingsResult> result =
-                LocationServices.SettingsApi.checkLocationSettings(mGoogleApiClient, locationSettingsRequestBuilder.build());
-        result.setResultCallback(new ResultCallback<LocationSettingsResult>() {
-            @Override
-            public void onResult(LocationSettingsResult result) {
-                final Status status = result.getStatus();
-                //final LocationSettingsStates locationSettingsStates = result.getLocationSettingsStates();
-                switch (status.getStatusCode()) {
-                    case LocationSettingsStatusCodes.SUCCESS:
-                        // All location settings are satisfied. The client can initialize location requests here.
-                        startLocationService();
-                        break;
-                    case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                        // Location settings are not satisfied. But could be fixed by showing the user
-                        // a dialog.
-                        try {
-                            // Show the dialog by calling startResolutionForResult(),
-                            // and check the result in onActivityResult().
-                            status.startResolutionForResult(MainActivity.this,
-                                    REQUEST_CHECK_SETTINGS);
-                        } catch (IntentSender.SendIntentException e) {
-                            // Ignore the error.
-                        }
-                        break;
-                    case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                        Log.e(TAG, "Settings change unavailable. We have no way to fix the settings so we won't show the dialog.");
-                        break;
-                }
-            }
-        });
     }
 }

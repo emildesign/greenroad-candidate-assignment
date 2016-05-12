@@ -22,9 +22,12 @@ import com.google.android.gms.location.LocationSettingsResult;
 
 import assignment.candidate.greenroad.com.emiladjiev.helpers.AndroidHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
+import assignment.candidate.greenroad.com.emiladjiev.realm.RealmHelper;
 import assignment.candidate.greenroad.com.emiladjiev.realm.RealmLocationReceiver;
 import pl.charmas.android.reactivelocation.ReactiveLocationProvider;
 import rx.Observable;
+import rx.Subscription;
+import rx.functions.Action1;
 import rx.functions.Func1;
 
 /**
@@ -33,22 +36,22 @@ import rx.functions.Func1;
  *
  * @author Emil on 09/05/2016.
  */
-public class BackgroundLocationService extends Service implements
-        GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
+public class BackgroundLocationService extends Service {
 
     private static final String TAG = "LocationService";
-    private GoogleApiClient mGoogleApiClient;
     private LocationRequest mLocationRequest;
 
     // Flag that indicates if a request is underway.
     private boolean mInProgress;
     private PowerManager.WakeLock mWakeLock;
     private Boolean servicesAvailable = false;
-    private ReactiveLocationProvider locationProvider;
+    private ReactiveLocationProvider mLocationProvider;
     private Observable<Location> mLocationUpdatesObservable;
+    private Subscription mLocationUpdatesSubscription;
 
     // Binder
     IBinder mBinder = new LocalBinder();
+
     public class LocalBinder extends Binder {
         public BackgroundLocationService getServerInstance() {
             return BackgroundLocationService.this;
@@ -61,7 +64,7 @@ public class BackgroundLocationService extends Service implements
         mInProgress = false;
         servicesAvailable = AndroidHelper.isPlayServicesAvailable(this);
         mLocationRequest = GoogleApiClientHelper.getLocationRequest(true);
-        setUpGoogleApiClientIfNeeded();
+        mLocationProvider = new ReactiveLocationProvider(getApplicationContext());
     }
 
     @Override
@@ -85,23 +88,9 @@ public class BackgroundLocationService extends Service implements
             this.mWakeLock.acquire();
         }
 
-        if (!servicesAvailable || mGoogleApiClient.isConnected() || mInProgress)
+        /* if (!servicesAvailable || mGoogleApiClient.isConnected() || mInProgress)
             return START_STICKY;
-
-        locationProvider = new ReactiveLocationProvider(getApplicationContext());
-        mLocationUpdatesObservable = locationProvider
-                .checkLocationSettings(
-                        new LocationSettingsRequest.Builder()
-                                .addLocationRequest(mLocationRequest)
-                                .setAlwaysShow(true)  //Refrence: http://stackoverflow.com/questions/29824408/google-play-services-locationservices-api-new-option-never
-                                .build()
-                )
-                .flatMap(new Func1<LocationSettingsResult, Observable<Location>>() {
-                    @Override
-                    public Observable<Location> call(LocationSettingsResult locationSettingsResult) {
-                        return locationProvider.getUpdatedLocation(mLocationRequest);
-                    }
-                });
+        }*/
 
         return START_STICKY;
     }
@@ -111,82 +100,40 @@ public class BackgroundLocationService extends Service implements
         // Turn off the request flag
         this.mInProgress = false;
 
-        stopLocationUpdates();
-        if (this.servicesAvailable && this.mGoogleApiClient != null) {
-            this.mGoogleApiClient.unregisterConnectionCallbacks(this);
-            this.mGoogleApiClient.unregisterConnectionFailedListener(this);
-            this.mGoogleApiClient.disconnect();
-            this.mGoogleApiClient = null;
-        }
-
         if (this.mWakeLock != null) {
             this.mWakeLock.release();
             this.mWakeLock = null;
         }
 
-        //Toast.makeText(this, DateFormat.getDateTimeInstance().format(new Date()) + " : Disconnected", Toast.LENGTH_SHORT).show();
+        stopServiceSubscription();
         super.onDestroy();
     }
 
-    /*
-     * Create a new location client, using the enclosing class to
-     * handle callbacks.
-     */
-    private void setUpGoogleApiClientIfNeeded() {
-        if (mGoogleApiClient == null)
-            mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
+    public ReactiveLocationProvider getLocationProvider() {
+        return mLocationProvider;
+    }
+
+    public Observable<LocationSettingsResult> getLocationSettingsResult() {
+        return mLocationProvider.checkLocationSettings(
+                new LocationSettingsRequest.Builder()
+                        .addLocationRequest(mLocationRequest)
+                        .setAlwaysShow(true)  //Refrence: http://stackoverflow.com/questions/29824408/google-play-services-locationservices-api-new-option-never
+                        .build()
+        );
     }
 
     public Observable<Location> getLocationUpdatesObservable() {
+        mLocationUpdatesObservable = getLocationSettingsResult()
+                .flatMap(locationSettingsResult -> mLocationProvider.getUpdatedLocation(mLocationRequest));
+
+        mLocationUpdatesSubscription = mLocationUpdatesObservable.subscribe(location -> RealmHelper.saveLocationToRealmByCreatingObject(LUSApplication.getInstance().getRealm(), location));
+
         return mLocationUpdatesObservable;
     }
 
-    @Override
-    public void onConnected(Bundle bundle) {
-        //Toast.makeText(this, DateFormat.getDateTimeInstance().format(new Date()) + " : Connected", Toast.LENGTH_SHORT).show();
-        startLocationUpdates();
-    }
-
-    /**
-     * Requests location updates from the FusedLocationApi.
-     */
-    protected void startLocationUpdates() {
-        Intent intent = new Intent(this, RealmLocationReceiver.class);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            return;
+    public void stopServiceSubscription() {
+        if (mLocationUpdatesSubscription != null && !mLocationUpdatesSubscription.isUnsubscribed()) {
+            mLocationUpdatesSubscription.unsubscribe();
         }
-
-        LocationServices.FusedLocationApi.requestLocationUpdates(this.mGoogleApiClient, mLocationRequest, pendingIntent); // This is the changed line.
-    }
-
-    /**
-     * Removes location updates from the FusedLocationApi.
-     */
-    protected void stopLocationUpdates() {
-        Intent intent = new Intent(this, RealmLocationReceiver.class);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 54321, intent, PendingIntent.FLAG_CANCEL_CURRENT);
-        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient, pendingIntent);
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-        mInProgress = false;
-        mGoogleApiClient = null;
-    }
-
-    @Override
-    public void onConnectionFailed(ConnectionResult connectionResult) {
-        mInProgress = false;
-
-        /*
-         * Google Play services can resolve some errors it detects.
-         * If the error has a resolution, try sending an Intent to
-         * start a Google Play services activity that can resolve
-         * error.
-         */
-        if (connectionResult.hasResolution()) {
-            // If no resolution is available, display an error dialog
-        } else {}
     }
 }
