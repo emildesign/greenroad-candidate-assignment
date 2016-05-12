@@ -45,15 +45,12 @@ public class LUSApplication extends Application {
         return mBus;
     }
 
-    public List<LUSLocation> getAllActiveAndroidSavedLocations() {
-        return new Select()
-                .from(LUSLocation.class)
-                .orderBy("time ASC")
-                .execute();
+    public List<LUSLocation> getAllActiveAndroidLocations() {
+        return new Select().from(LUSLocation.class).orderBy("time ASC").execute();
     }
 
     public RealmResults<RealmLocation> getAllRealmLocations() {
-        return  getRealm().where(RealmLocation.class).findAllSorted("time", Sort.ASCENDING);
+        return getRealm().where(RealmLocation.class).findAllSorted("time", Sort.ASCENDING);
     }
 
     private void initRealm() {

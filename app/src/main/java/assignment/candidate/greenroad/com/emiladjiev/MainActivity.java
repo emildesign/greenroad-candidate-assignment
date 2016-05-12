@@ -479,7 +479,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
                     case LocationSettingsStatusCodes.SUCCESS:
                         // All location settings are satisfied. The client can initialize location requests here.
                         startLocationService();
-
                         break;
                     case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
                         // Location settings are not satisfied. But could be fixed by showing the user

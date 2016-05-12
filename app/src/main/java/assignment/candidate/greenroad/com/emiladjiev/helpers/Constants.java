@@ -37,4 +37,9 @@ public final class Constants {
     private Constants() {
         throw new AssertionError();
     }
+
+    // DB Types:
+    public static final int DB_TYPE_ACTIVE_ANDROID = 0;
+    public static final int DB_TYPE_REALM = 1;
+    public static final int DB_TYPE_GREEN_DAO = 2;
 }
