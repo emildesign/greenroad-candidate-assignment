@@ -27,11 +27,9 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.squareup.otto.Subscribe;
@@ -40,6 +38,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.AndroidHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
+import assignment.candidate.greenroad.com.emiladjiev.helpers.MapHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
 import io.realm.RealmResults;
 
@@ -93,6 +92,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         setContentView(R.layout.activity_main);
         mMapFragment = (SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map);
         mMapFragment.getMapAsync(this);
+
         bEnable = (Button) findViewById(R.id.bEnable);
         bDisable = (Button) findViewById(R.id.bDisable);
         tvLatitudeValue = (TextView) findViewById(R.id.tvLatitudeValue);
@@ -108,7 +108,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mLastUpdateTime = "";
         mLastSpeed = 0f;
 
-        // Update values using data stored in the Bundle.
+        // Update values using data stored in the Bundle of save instance state.
         updateValuesFromBundle(savedInstanceState);
         setButtonsEnabledState();
     }
@@ -121,16 +121,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
             setAllButtonsToDisableState();
         } else setUpGoogleApiClientIfNeededAndConnected();
-    }
-
-    private void addPolylineOnMap(LatLng previousLocation, LatLng location) {
-        if (previousLocation != null && location != null) {
-            mMap.addPolyline((new PolylineOptions()).add(previousLocation, location));
-        }
-    }
-
-    private LatLng getLatLngFromLocation(Location location) {
-        return new LatLng(location.getLatitude(), location.getLongitude());
     }
 
     @Override
@@ -193,7 +183,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     public void onLocationResultReceived(LocationResult locationResult) {
         Location location = locationResult.getLastLocation();
         if (location != null && mCurrentLocation != null) {
-            addPolylineOnMap(getLatLngFromLocation(mCurrentLocation), getLatLngFromLocation(location));
+            MapHelper.addPolylineOnMap(mMap, MapHelper.getLatLngFromLocation(mCurrentLocation), MapHelper.getLatLngFromLocation(location));
             mCurrentLocation = location;
             updateViewAndMap();
         } else if (location != null) {
@@ -219,7 +209,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             RealmResults<RealmLocation> allRealmLocations = LUSApplication.getInstance().getAllRealmLocations();
             for (int i = 0; i < allRealmLocations.size() - 1; i++) {
                 mCurrentLocation = allRealmLocations.get(i + 1).getLocation();
-                addPolylineOnMap(allRealmLocations.get(i).getLatLong(), allRealmLocations.get(i + 1).getLatLong());
+                MapHelper.addPolylineOnMap(mMap, allRealmLocations.get(i).getLatLong(), allRealmLocations.get(i + 1).getLatLong());
             }
         }
     }
@@ -334,20 +324,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    public void zoomInMapOnMyCurrentLocationWithZoom(float zoomLevel, GoogleMap map, Location location) {
-        if (location != null && map != null) {
-            map.animateCamera(CameraUpdateFactory.newCameraPosition(getCameraPositionFromLocationWithZoom(location, zoomLevel)));
-        }
-    }
-
-    public static CameraPosition getCameraPositionFromLocationWithZoom(Location location, float zoomLevel) {
-        CameraPosition cameraPosition = new CameraPosition.Builder()
-                .target(new LatLng(location.getLatitude(), location.getLongitude()))
-                .zoom(zoomLevel).build();
-
-        return cameraPosition;
-    }
-
     private void setUpGoogleApiClientIfNeededAndConnected() {
         if (mGoogleApiClient == null)
             mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
@@ -412,7 +388,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             mLastSpeed = mCurrentLocation.getSpeed();
 
             updateUI();
-            zoomInMapOnMyCurrentLocationWithZoom(16, mMap, mCurrentLocation);
+            MapHelper.zoomInMapOnMyCurrentLocationWithZoom(16, mMap, mCurrentLocation);
         }
     }
 
