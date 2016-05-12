@@ -134,7 +134,7 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         if (PermissionUtils.checkForLocationPermission(this)) {
             PermissionUtils.requestLocationPermission(this, MY_PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
             setAllButtonsToDisableState();
-        } else setUpGoogleApiClientIfNeededAndConnected();
+        } else startLocationService();
     }
 
     @Override
@@ -320,25 +320,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         startService(locationServiceIntent);
         bindToLocationService();
         setButtonsEnabledState();
-        mLocationUpdatesObservable = mLocationService.getLocationUpdatesObservable();
-        mSharedLocationUpdatesArrayObservable = mLocationUpdatesObservable
-                .map(new LocationToStringsArrayListFunc()).share();
-
-        mLatitudeSubscription = mSharedLocationUpdatesArrayObservable
-                .map(new ListItemAtIndexFunc(0))
-                .subscribe(new DisplayTextOnViewAction(tvLatitudeValue), new ErrorHandler());
-
-        mLongitudeSubscription = mSharedLocationUpdatesArrayObservable
-                .map(new ListItemAtIndexFunc(1))
-                .subscribe(new DisplayTextOnViewAction(tvLongitudeValue), new ErrorHandler());
-
-        mLastUpdateSubscription = mSharedLocationUpdatesArrayObservable
-                .map(new ListItemAtIndexFunc(2))
-                .subscribe(new DisplayTextOnViewAction(tvLastUpdateValue), new ErrorHandler());
-
-        mSpeedSubscription = mSharedLocationUpdatesArrayObservable
-                .map(new ListItemAtIndexFunc(3))
-                .subscribe(new DisplayTextOnViewAction(tvSpeedValue), new ErrorHandler());
     }
 
     private class ErrorHandler implements Action1<Throwable> {
@@ -397,6 +378,25 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             mBounded = true;
             BackgroundLocationService.LocalBinder mLocalBinder = (BackgroundLocationService.LocalBinder)service;
             mLocationService = mLocalBinder.getServerInstance();
+            mLocationUpdatesObservable = mLocationService.getLocationUpdatesObservable();
+            mSharedLocationUpdatesArrayObservable = mLocationUpdatesObservable
+                    .map(new LocationToStringsArrayListFunc()).share();
+
+            mLatitudeSubscription = mSharedLocationUpdatesArrayObservable
+                    .map(new ListItemAtIndexFunc(0))
+                    .subscribe(new DisplayTextOnViewAction(tvLatitudeValue), new ErrorHandler());
+
+            mLongitudeSubscription = mSharedLocationUpdatesArrayObservable
+                    .map(new ListItemAtIndexFunc(1))
+                    .subscribe(new DisplayTextOnViewAction(tvLongitudeValue), new ErrorHandler());
+
+            mLastUpdateSubscription = mSharedLocationUpdatesArrayObservable
+                    .map(new ListItemAtIndexFunc(2))
+                    .subscribe(new DisplayTextOnViewAction(tvLastUpdateValue), new ErrorHandler());
+
+            mSpeedSubscription = mSharedLocationUpdatesArrayObservable
+                    .map(new ListItemAtIndexFunc(3))
+                    .subscribe(new DisplayTextOnViewAction(tvSpeedValue), new ErrorHandler());
         }
     };
 
@@ -470,7 +470,6 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
             }
         }
     };
-
 
     private void checkForLocationSettings(final Boolean userStartedTheService) {
         LocationSettingsRequest.Builder locationSettingsRequestBuilder = new LocationSettingsRequest.Builder().addLocationRequest(GoogleApiClientHelper.getLocationRequest(true));
