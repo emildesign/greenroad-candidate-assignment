@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.realm;
 
 import android.location.Location;
 import com.google.android.gms.maps.model.LatLng;

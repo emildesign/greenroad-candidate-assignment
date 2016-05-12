@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.realm;
 
 import android.location.Location;
 import android.support.annotation.Nullable;

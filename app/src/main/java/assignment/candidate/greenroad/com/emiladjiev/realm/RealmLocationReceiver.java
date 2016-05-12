@@ -1,4 +1,4 @@
-package assignment.candidate.greenroad.com.emiladjiev;
+package assignment.candidate.greenroad.com.emiladjiev.realm;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -7,8 +7,7 @@ import android.util.Log;
 
 import com.google.android.gms.location.LocationResult;
 
-import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
-import io.realm.Realm;
+import assignment.candidate.greenroad.com.emiladjiev.LUSApplication;
 
 /**
  * Created by Emil on 09/05/2016.
