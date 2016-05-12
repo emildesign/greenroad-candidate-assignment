@@ -95,23 +95,13 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         mMapFragment.getMapAsync(this);
         bEnable = (Button) findViewById(R.id.bEnable);
         bDisable = (Button) findViewById(R.id.bDisable);
-        bEnable.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                startUpdatesButtonHandler();
-            }
-        });
-        bDisable.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                stopUpdatesButtonHandler();
-            }
-        });
-
         tvLatitudeValue = (TextView) findViewById(R.id.tvLatitudeValue);
         tvLongitudeValue = (TextView) findViewById(R.id.tvLongitudeValue);
         tvLastUpdateValue = (TextView) findViewById(R.id.tvLastUpdateValue);
         tvSpeedValue = (TextView) findViewById(R.id.tvSpeedValue);
+
+        bEnable.setOnClickListener(v -> startUpdatesButtonHandler());
+        bDisable.setOnClickListener(v -> stopUpdatesButtonHandler());
 
         mRequestingLocationUpdates = false;
         mUserStartedTheService = false;
