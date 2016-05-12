@@ -16,6 +16,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -35,12 +36,20 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.squareup.otto.Subscribe;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.AndroidHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
+import assignment.candidate.greenroad.com.emiladjiev.realm.RealmLocation;
+import assignment.candidate.greenroad.com.emiladjiev.rx_helpers.ListItemAtIndexFunc;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.MapHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.PermissionUtils;
+import assignment.candidate.greenroad.com.emiladjiev.rx_helpers.DisplayTextOnViewAction;
+import assignment.candidate.greenroad.com.emiladjiev.rx_helpers.LocationToStringsArrayListFunc;
 import io.realm.RealmResults;
+import rx.Observable;
+import rx.Subscription;
+import rx.functions.Action1;
 
 public class MainActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener {
 
@@ -67,6 +76,11 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
     private boolean mBounded;
     private BackgroundLocationService mLocationService;
     private GoogleApiClient mGoogleApiClient;
+    private Observable<Location> mLocationUpdatesObservable;
+    private Subscription mLastKnownLocationSubscription;
+    private Subscription mUpdatableLocationSubscription;
+    private Observable<ArrayList<String>> mSharedLocationUpdatesArrayObservable;
+    private Subscription mLatitudeSubscription, mLongitudeSubscription, mLastUpdateSubscription, mSpeedSubscription;
 
     /**
      * Represents a geographical location.
@@ -306,6 +320,33 @@ public class MainActivity extends FragmentActivity implements OnMapReadyCallback
         startService(locationServiceIntent);
         bindToLocationService();
         setButtonsEnabledState();
+        mLocationUpdatesObservable = mLocationService.getLocationUpdatesObservable();
+        mSharedLocationUpdatesArrayObservable = mLocationUpdatesObservable
+                .map(new LocationToStringsArrayListFunc()).share();
+
+        mLatitudeSubscription = mSharedLocationUpdatesArrayObservable
+                .map(new ListItemAtIndexFunc(0))
+                .subscribe(new DisplayTextOnViewAction(tvLatitudeValue), new ErrorHandler());
+
+        mLongitudeSubscription = mSharedLocationUpdatesArrayObservable
+                .map(new ListItemAtIndexFunc(1))
+                .subscribe(new DisplayTextOnViewAction(tvLongitudeValue), new ErrorHandler());
+
+        mLastUpdateSubscription = mSharedLocationUpdatesArrayObservable
+                .map(new ListItemAtIndexFunc(2))
+                .subscribe(new DisplayTextOnViewAction(tvLastUpdateValue), new ErrorHandler());
+
+        mSpeedSubscription = mSharedLocationUpdatesArrayObservable
+                .map(new ListItemAtIndexFunc(3))
+                .subscribe(new DisplayTextOnViewAction(tvSpeedValue), new ErrorHandler());
+    }
+
+    private class ErrorHandler implements Action1<Throwable> {
+        @Override
+        public void call(Throwable throwable) {
+            Toast.makeText(MainActivity.this, "Error occurred.", Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "Error occurred", throwable);
+        }
     }
 
     private void stopLocationService() {

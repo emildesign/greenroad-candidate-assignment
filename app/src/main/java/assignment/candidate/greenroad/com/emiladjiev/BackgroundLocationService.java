@@ -6,17 +6,26 @@ import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.support.v4.app.ActivityCompat;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.LocationSettingsRequest;
+import com.google.android.gms.location.LocationSettingsResult;
+
 import assignment.candidate.greenroad.com.emiladjiev.helpers.AndroidHelper;
 import assignment.candidate.greenroad.com.emiladjiev.helpers.GoogleApiClientHelper;
+import assignment.candidate.greenroad.com.emiladjiev.realm.RealmLocationReceiver;
+import pl.charmas.android.reactivelocation.ReactiveLocationProvider;
+import rx.Observable;
+import rx.functions.Func1;
 
 /**
  * BackgroundLocationService used for tracking user location in the background.
@@ -35,6 +44,8 @@ public class BackgroundLocationService extends Service implements
     private boolean mInProgress;
     private PowerManager.WakeLock mWakeLock;
     private Boolean servicesAvailable = false;
+    private ReactiveLocationProvider locationProvider;
+    private Observable<Location> mLocationUpdatesObservable;
 
     // Binder
     IBinder mBinder = new LocalBinder();
@@ -77,14 +88,20 @@ public class BackgroundLocationService extends Service implements
         if (!servicesAvailable || mGoogleApiClient.isConnected() || mInProgress)
             return START_STICKY;
 
-        setUpGoogleApiClientIfNeeded();
-        if (!mGoogleApiClient.isConnected() || !mGoogleApiClient.isConnecting() && !mInProgress) {
-            //appendLog(DateFormat.getDateTimeInstance().format(new Date()) + ": Started", Constants.LOG_FILE);
-            mInProgress = true;
-            mGoogleApiClient.connect();
-        } else {
-            startLocationUpdates();
-        }
+        locationProvider = new ReactiveLocationProvider(getApplicationContext());
+        mLocationUpdatesObservable = locationProvider
+                .checkLocationSettings(
+                        new LocationSettingsRequest.Builder()
+                                .addLocationRequest(mLocationRequest)
+                                .setAlwaysShow(true)  //Refrence: http://stackoverflow.com/questions/29824408/google-play-services-locationservices-api-new-option-never
+                                .build()
+                )
+                .flatMap(new Func1<LocationSettingsResult, Observable<Location>>() {
+                    @Override
+                    public Observable<Location> call(LocationSettingsResult locationSettingsResult) {
+                        return locationProvider.getUpdatedLocation(mLocationRequest);
+                    }
+                });
 
         return START_STICKY;
     }
@@ -120,6 +137,9 @@ public class BackgroundLocationService extends Service implements
             mGoogleApiClient = GoogleApiClientHelper.getApiClientForLocation(this, this, this);
     }
 
+    public Observable<Location> getLocationUpdatesObservable() {
+        return mLocationUpdatesObservable;
+    }
 
     @Override
     public void onConnected(Bundle bundle) {

@@ -11,6 +11,7 @@ import com.squareup.otto.ThreadEnforcer;
 import java.util.List;
 
 import assignment.candidate.greenroad.com.emiladjiev.active_android.LUSLocation;
+import assignment.candidate.greenroad.com.emiladjiev.realm.RealmLocation;
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
 import io.realm.RealmResults;
